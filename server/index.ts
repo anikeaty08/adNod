@@ -91,7 +91,7 @@ app.post("/api/assistant", async (req, res) => {
 
   res.json({
     reply: completion.choices?.[0]?.message?.content ?? "",
-    model: completion.model ?? process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+    model: completion.model ?? process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
   });
 });
 

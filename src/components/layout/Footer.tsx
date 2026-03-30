@@ -1,4 +1,6 @@
 export function Footer() {
+  const adRegistryAddress = import.meta.env.VITE_ADREGISTRY_ADDRESS || "";
+
   return (
     <footer className="mt-16 border-t border-white/20 bg-white/55 py-12 backdrop-blur-xl dark:border-white/5 dark:bg-slate-950/45">
       <div className="page-shell grid gap-8 lg:grid-cols-[1.2fr_0.8fr_0.8fr]">
@@ -24,7 +26,7 @@ export function Footer() {
             </a>
             <a
               className="hover:text-foreground"
-              href="https://sepolia.arbiscan.io/address/0x93f5A88d41060f5c3E046849d59363FbA87E9813"
+              href={`https://sepolia.arbiscan.io/address/${adRegistryAddress}`}
               target="_blank"
               rel="noreferrer"
             >

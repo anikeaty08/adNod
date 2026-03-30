@@ -57,7 +57,7 @@ const cofheConfig = createCofheConfig({
       name: "Arbitrum Sepolia",
     },
   ],
-  useWorkers: true,
+  useWorkers: false,
 });
 
 const cofheClient = createCofheClient(cofheConfig);

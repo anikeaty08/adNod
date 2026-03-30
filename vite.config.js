@@ -7,10 +7,9 @@ export default defineConfig({
     resolve: {
         alias: {
             "@": path.resolve(__dirname, "./src"),
-            "fhenixjs-bundled": path.resolve(__dirname, "./node_modules/fhenixjs/dist/fhenix.esm.js"),
         },
     },
-    optimizeDeps: {
-        exclude: ["fhenixjs"],
+    worker: {
+        format: "es",
     },
 });

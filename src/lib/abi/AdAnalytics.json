@@ -1,402 +1,274 @@
 [
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "address",
-                           "name":  "registryAddress",
-                           "type":  "address"
-                       },
-                       {
-                           "internalType":  "address",
-                           "name":  "initialOwner",
-                           "type":  "address"
-                       }
-                   ],
-        "stateMutability":  "nonpayable",
-        "type":  "constructor"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "ECDSAInvalidSignature",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "uint256",
-                           "name":  "length",
-                           "type":  "uint256"
-                       }
-                   ],
-        "name":  "ECDSAInvalidSignatureLength",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "bytes32",
-                           "name":  "s",
-                           "type":  "bytes32"
-                       }
-                   ],
-        "name":  "ECDSAInvalidSignatureS",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "InvalidShortString",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "address",
-                           "name":  "owner",
-                           "type":  "address"
-                       }
-                   ],
-        "name":  "OwnableInvalidOwner",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "address",
-                           "name":  "account",
-                           "type":  "address"
-                       }
-                   ],
-        "name":  "OwnableUnauthorizedAccount",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "SignerNotMessageSender",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "SignerNotOwner",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "string",
-                           "name":  "str",
-                           "type":  "string"
-                       }
-                   ],
-        "name":  "StringTooLong",
-        "type":  "error"
-    },
-    {
-        "anonymous":  false,
-        "inputs":  [
-                       {
-                           "indexed":  true,
-                           "internalType":  "uint256",
-                           "name":  "campaignId",
-                           "type":  "uint256"
-                       }
-                   ],
-        "name":  "ClickRecorded",
-        "type":  "event"
-    },
-    {
-        "anonymous":  false,
-        "inputs":  [
-
-                   ],
-        "name":  "EIP712DomainChanged",
-        "type":  "event"
-    },
-    {
-        "anonymous":  false,
-        "inputs":  [
-                       {
-                           "indexed":  true,
-                           "internalType":  "address",
-                           "name":  "developer",
-                           "type":  "address"
-                       }
-                   ],
-        "name":  "EarningsAdded",
-        "type":  "event"
-    },
-    {
-        "anonymous":  false,
-        "inputs":  [
-                       {
-                           "indexed":  true,
-                           "internalType":  "uint256",
-                           "name":  "campaignId",
-                           "type":  "uint256"
-                       }
-                   ],
-        "name":  "ImpressionRecorded",
-        "type":  "event"
-    },
-    {
-        "anonymous":  false,
-        "inputs":  [
-                       {
-                           "indexed":  true,
-                           "internalType":  "address",
-                           "name":  "previousOwner",
-                           "type":  "address"
-                       },
-                       {
-                           "indexed":  true,
-                           "internalType":  "address",
-                           "name":  "newOwner",
-                           "type":  "address"
-                       }
-                   ],
-        "name":  "OwnershipTransferred",
-        "type":  "event"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "address",
-                           "name":  "developer",
-                           "type":  "address"
-                       },
-                       {
-                           "components":  [
-                                              {
-                                                  "internalType":  "bytes",
-                                                  "name":  "data",
-                                                  "type":  "bytes"
-                                              },
-                                              {
-                                                  "internalType":  "int32",
-                                                  "name":  "securityZone",
-                                                  "type":  "int32"
-                                              }
-                                          ],
-                           "internalType":  "struct inEuint64",
-                           "name":  "amount",
-                           "type":  "tuple"
-                       }
-                   ],
-        "name":  "addEarnings",
-        "outputs":  [
-
-                    ],
-        "stateMutability":  "nonpayable",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "eip712Domain",
-        "outputs":  [
-                        {
-                            "internalType":  "bytes1",
-                            "name":  "fields",
-                            "type":  "bytes1"
-                        },
-                        {
-                            "internalType":  "string",
-                            "name":  "name",
-                            "type":  "string"
-                        },
-                        {
-                            "internalType":  "string",
-                            "name":  "version",
-                            "type":  "string"
-                        },
-                        {
-                            "internalType":  "uint256",
-                            "name":  "chainId",
-                            "type":  "uint256"
-                        },
-                        {
-                            "internalType":  "address",
-                            "name":  "verifyingContract",
-                            "type":  "address"
-                        },
-                        {
-                            "internalType":  "bytes32",
-                            "name":  "salt",
-                            "type":  "bytes32"
-                        },
-                        {
-                            "internalType":  "uint256[]",
-                            "name":  "extensions",
-                            "type":  "uint256[]"
-                        }
-                    ],
-        "stateMutability":  "view",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-                       {
-                           "components":  [
-                                              {
-                                                  "internalType":  "bytes32",
-                                                  "name":  "publicKey",
-                                                  "type":  "bytes32"
-                                              },
-                                              {
-                                                  "internalType":  "bytes",
-                                                  "name":  "signature",
-                                                  "type":  "bytes"
-                                              }
-                                          ],
-                           "internalType":  "struct Permission",
-                           "name":  "permission",
-                           "type":  "tuple"
-                       }
-                   ],
-        "name":  "getMyEarnings",
-        "outputs":  [
-                        {
-                            "internalType":  "string",
-                            "name":  "encryptedEarnings",
-                            "type":  "string"
-                        }
-                    ],
-        "stateMutability":  "view",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "uint256",
-                           "name":  "campaignId",
-                           "type":  "uint256"
-                       },
-                       {
-                           "components":  [
-                                              {
-                                                  "internalType":  "bytes32",
-                                                  "name":  "publicKey",
-                                                  "type":  "bytes32"
-                                              },
-                                              {
-                                                  "internalType":  "bytes",
-                                                  "name":  "signature",
-                                                  "type":  "bytes"
-                                              }
-                                          ],
-                           "internalType":  "struct Permission",
-                           "name":  "permission",
-                           "type":  "tuple"
-                       }
-                   ],
-        "name":  "getMyStats",
-        "outputs":  [
-                        {
-                            "internalType":  "string",
-                            "name":  "encryptedImpressions",
-                            "type":  "string"
-                        },
-                        {
-                            "internalType":  "string",
-                            "name":  "encryptedClicks",
-                            "type":  "string"
-                        }
-                    ],
-        "stateMutability":  "view",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "owner",
-        "outputs":  [
-                        {
-                            "internalType":  "address",
-                            "name":  "",
-                            "type":  "address"
-                        }
-                    ],
-        "stateMutability":  "view",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "uint256",
-                           "name":  "campaignId",
-                           "type":  "uint256"
-                       }
-                   ],
-        "name":  "recordClick",
-        "outputs":  [
-
-                    ],
-        "stateMutability":  "nonpayable",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "uint256",
-                           "name":  "campaignId",
-                           "type":  "uint256"
-                       }
-                   ],
-        "name":  "recordImpression",
-        "outputs":  [
-
-                    ],
-        "stateMutability":  "nonpayable",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "registry",
-        "outputs":  [
-                        {
-                            "internalType":  "contract IAdRegistry",
-                            "name":  "",
-                            "type":  "address"
-                        }
-                    ],
-        "stateMutability":  "view",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "renounceOwnership",
-        "outputs":  [
-
-                    ],
-        "stateMutability":  "nonpayable",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "address",
-                           "name":  "newOwner",
-                           "type":  "address"
-                       }
-                   ],
-        "name":  "transferOwnership",
-        "outputs":  [
-
-                    ],
-        "stateMutability":  "nonpayable",
-        "type":  "function"
-    }
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "registryAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "initialOwner",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint8",
+        "name": "got",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint8",
+        "name": "expected",
+        "type": "uint8"
+      }
+    ],
+    "name": "InvalidEncryptedInput",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableInvalidOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "int32",
+        "name": "value",
+        "type": "int32"
+      }
+    ],
+    "name": "SecurityZoneOutOfBounds",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "campaignId",
+        "type": "uint256"
+      }
+    ],
+    "name": "ClickRecorded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "developer",
+        "type": "address"
+      }
+    ],
+    "name": "EarningsAdded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "campaignId",
+        "type": "uint256"
+      }
+    ],
+    "name": "ImpressionRecorded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "developer",
+        "type": "address"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "ctHash",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint8",
+            "name": "securityZone",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint8",
+            "name": "utype",
+            "type": "uint8"
+          },
+          {
+            "internalType": "bytes",
+            "name": "signature",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct InEuint64",
+        "name": "amount",
+        "type": "tuple"
+      }
+    ],
+    "name": "addEarnings",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getMyEarnings",
+    "outputs": [
+      {
+        "internalType": "euint64",
+        "name": "encryptedEarnings",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "campaignId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getMyStats",
+    "outputs": [
+      {
+        "internalType": "euint32",
+        "name": "encryptedImpressions",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "euint32",
+        "name": "encryptedClicks",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "campaignId",
+        "type": "uint256"
+      }
+    ],
+    "name": "recordClick",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "campaignId",
+        "type": "uint256"
+      }
+    ],
+    "name": "recordImpression",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "registry",
+    "outputs": [
+      {
+        "internalType": "contract IAdRegistry",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
 ]

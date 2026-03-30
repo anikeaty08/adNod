@@ -1,600 +1,492 @@
 [
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "address",
-                           "name":  "initialOwner",
-                           "type":  "address"
-                       }
-                   ],
-        "stateMutability":  "nonpayable",
-        "type":  "constructor"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "ECDSAInvalidSignature",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "uint256",
-                           "name":  "length",
-                           "type":  "uint256"
-                       }
-                   ],
-        "name":  "ECDSAInvalidSignatureLength",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "bytes32",
-                           "name":  "s",
-                           "type":  "bytes32"
-                       }
-                   ],
-        "name":  "ECDSAInvalidSignatureS",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "InvalidShortString",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "address",
-                           "name":  "owner",
-                           "type":  "address"
-                       }
-                   ],
-        "name":  "OwnableInvalidOwner",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "address",
-                           "name":  "account",
-                           "type":  "address"
-                       }
-                   ],
-        "name":  "OwnableUnauthorizedAccount",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "SignerNotMessageSender",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "SignerNotOwner",
-        "type":  "error"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "string",
-                           "name":  "str",
-                           "type":  "string"
-                       }
-                   ],
-        "name":  "StringTooLong",
-        "type":  "error"
-    },
-    {
-        "anonymous":  false,
-        "inputs":  [
-                       {
-                           "indexed":  true,
-                           "internalType":  "uint256",
-                           "name":  "slotId",
-                           "type":  "uint256"
-                       },
-                       {
-                           "indexed":  true,
-                           "internalType":  "uint256",
-                           "name":  "campaignId",
-                           "type":  "uint256"
-                       }
-                   ],
-        "name":  "CampaignAssignedToSlot",
-        "type":  "event"
-    },
-    {
-        "anonymous":  false,
-        "inputs":  [
-                       {
-                           "indexed":  true,
-                           "internalType":  "uint256",
-                           "name":  "id",
-                           "type":  "uint256"
-                       },
-                       {
-                           "indexed":  true,
-                           "internalType":  "address",
-                           "name":  "hoster",
-                           "type":  "address"
-                       },
-                       {
-                           "indexed":  false,
-                           "internalType":  "string",
-                           "name":  "creativeURI",
-                           "type":  "string"
-                       },
-                       {
-                           "indexed":  false,
-                           "internalType":  "string",
-                           "name":  "category",
-                           "type":  "string"
-                       }
-                   ],
-        "name":  "CampaignCreated",
-        "type":  "event"
-    },
-    {
-        "anonymous":  false,
-        "inputs":  [
-
-                   ],
-        "name":  "EIP712DomainChanged",
-        "type":  "event"
-    },
-    {
-        "anonymous":  false,
-        "inputs":  [
-                       {
-                           "indexed":  true,
-                           "internalType":  "address",
-                           "name":  "previousOwner",
-                           "type":  "address"
-                       },
-                       {
-                           "indexed":  true,
-                           "internalType":  "address",
-                           "name":  "newOwner",
-                           "type":  "address"
-                       }
-                   ],
-        "name":  "OwnershipTransferred",
-        "type":  "event"
-    },
-    {
-        "anonymous":  false,
-        "inputs":  [
-                       {
-                           "indexed":  true,
-                           "internalType":  "uint256",
-                           "name":  "id",
-                           "type":  "uint256"
-                       },
-                       {
-                           "indexed":  true,
-                           "internalType":  "address",
-                           "name":  "developer",
-                           "type":  "address"
-                       },
-                       {
-                           "indexed":  false,
-                           "internalType":  "string",
-                           "name":  "siteName",
-                           "type":  "string"
-                       },
-                       {
-                           "indexed":  false,
-                           "internalType":  "string",
-                           "name":  "category",
-                           "type":  "string"
-                       }
-                   ],
-        "name":  "SlotRegistered",
-        "type":  "event"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "uint256",
-                           "name":  "slotId",
-                           "type":  "uint256"
-                       },
-                       {
-                           "internalType":  "uint256",
-                           "name":  "campaignId",
-                           "type":  "uint256"
-                       }
-                   ],
-        "name":  "assignCampaignToSlot",
-        "outputs":  [
-
-                    ],
-        "stateMutability":  "nonpayable",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "uint256",
-                           "name":  "id",
-                           "type":  "uint256"
-                       }
-                   ],
-        "name":  "campaignHoster",
-        "outputs":  [
-                        {
-                            "internalType":  "address",
-                            "name":  "",
-                            "type":  "address"
-                        }
-                    ],
-        "stateMutability":  "view",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "string",
-                           "name":  "creativeURI",
-                           "type":  "string"
-                       },
-                       {
-                           "internalType":  "string",
-                           "name":  "category",
-                           "type":  "string"
-                       },
-                       {
-                           "components":  [
-                                              {
-                                                  "internalType":  "bytes",
-                                                  "name":  "data",
-                                                  "type":  "bytes"
-                                              },
-                                              {
-                                                  "internalType":  "int32",
-                                                  "name":  "securityZone",
-                                                  "type":  "int32"
-                                              }
-                                          ],
-                           "internalType":  "struct inEuint64",
-                           "name":  "budget",
-                           "type":  "tuple"
-                       },
-                       {
-                           "components":  [
-                                              {
-                                                  "internalType":  "bytes",
-                                                  "name":  "data",
-                                                  "type":  "bytes"
-                                              },
-                                              {
-                                                  "internalType":  "int32",
-                                                  "name":  "securityZone",
-                                                  "type":  "int32"
-                                              }
-                                          ],
-                           "internalType":  "struct inEuint32",
-                           "name":  "cpc",
-                           "type":  "tuple"
-                       }
-                   ],
-        "name":  "createCampaign",
-        "outputs":  [
-                        {
-                            "internalType":  "uint256",
-                            "name":  "id",
-                            "type":  "uint256"
-                        }
-                    ],
-        "stateMutability":  "nonpayable",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "eip712Domain",
-        "outputs":  [
-                        {
-                            "internalType":  "bytes1",
-                            "name":  "fields",
-                            "type":  "bytes1"
-                        },
-                        {
-                            "internalType":  "string",
-                            "name":  "name",
-                            "type":  "string"
-                        },
-                        {
-                            "internalType":  "string",
-                            "name":  "version",
-                            "type":  "string"
-                        },
-                        {
-                            "internalType":  "uint256",
-                            "name":  "chainId",
-                            "type":  "uint256"
-                        },
-                        {
-                            "internalType":  "address",
-                            "name":  "verifyingContract",
-                            "type":  "address"
-                        },
-                        {
-                            "internalType":  "bytes32",
-                            "name":  "salt",
-                            "type":  "bytes32"
-                        },
-                        {
-                            "internalType":  "uint256[]",
-                            "name":  "extensions",
-                            "type":  "uint256[]"
-                        }
-                    ],
-        "stateMutability":  "view",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "uint256",
-                           "name":  "id",
-                           "type":  "uint256"
-                       },
-                       {
-                           "components":  [
-                                              {
-                                                  "internalType":  "bytes32",
-                                                  "name":  "publicKey",
-                                                  "type":  "bytes32"
-                                              },
-                                              {
-                                                  "internalType":  "bytes",
-                                                  "name":  "signature",
-                                                  "type":  "bytes"
-                                              }
-                                          ],
-                           "internalType":  "struct Permission",
-                           "name":  "permission",
-                           "type":  "tuple"
-                       }
-                   ],
-        "name":  "getMyBudget",
-        "outputs":  [
-                        {
-                            "internalType":  "string",
-                            "name":  "encryptedBudget",
-                            "type":  "string"
-                        }
-                    ],
-        "stateMutability":  "view",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "uint256",
-                           "name":  "id",
-                           "type":  "uint256"
-                       },
-                       {
-                           "components":  [
-                                              {
-                                                  "internalType":  "bytes32",
-                                                  "name":  "publicKey",
-                                                  "type":  "bytes32"
-                                              },
-                                              {
-                                                  "internalType":  "bytes",
-                                                  "name":  "signature",
-                                                  "type":  "bytes"
-                                              }
-                                          ],
-                           "internalType":  "struct Permission",
-                           "name":  "permission",
-                           "type":  "tuple"
-                       }
-                   ],
-        "name":  "getMyCpc",
-        "outputs":  [
-                        {
-                            "internalType":  "string",
-                            "name":  "encryptedCpc",
-                            "type":  "string"
-                        }
-                    ],
-        "stateMutability":  "view",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "uint256",
-                           "name":  "id",
-                           "type":  "uint256"
-                       }
-                   ],
-        "name":  "getPublicInfo",
-        "outputs":  [
-                        {
-                            "internalType":  "string",
-                            "name":  "creativeURI",
-                            "type":  "string"
-                        },
-                        {
-                            "internalType":  "string",
-                            "name":  "category",
-                            "type":  "string"
-                        },
-                        {
-                            "internalType":  "bool",
-                            "name":  "active",
-                            "type":  "bool"
-                        }
-                    ],
-        "stateMutability":  "view",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "uint256",
-                           "name":  "id",
-                           "type":  "uint256"
-                       }
-                   ],
-        "name":  "isCampaignActive",
-        "outputs":  [
-                        {
-                            "internalType":  "bool",
-                            "name":  "",
-                            "type":  "bool"
-                        }
-                    ],
-        "stateMutability":  "view",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "nextCampaignId",
-        "outputs":  [
-                        {
-                            "internalType":  "uint256",
-                            "name":  "",
-                            "type":  "uint256"
-                        }
-                    ],
-        "stateMutability":  "view",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "nextSlotId",
-        "outputs":  [
-                        {
-                            "internalType":  "uint256",
-                            "name":  "",
-                            "type":  "uint256"
-                        }
-                    ],
-        "stateMutability":  "view",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "owner",
-        "outputs":  [
-                        {
-                            "internalType":  "address",
-                            "name":  "",
-                            "type":  "address"
-                        }
-                    ],
-        "stateMutability":  "view",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "string",
-                           "name":  "siteName",
-                           "type":  "string"
-                       },
-                       {
-                           "internalType":  "string",
-                           "name":  "category",
-                           "type":  "string"
-                       }
-                   ],
-        "name":  "registerSlot",
-        "outputs":  [
-                        {
-                            "internalType":  "uint256",
-                            "name":  "id",
-                            "type":  "uint256"
-                        }
-                    ],
-        "stateMutability":  "nonpayable",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-
-                   ],
-        "name":  "renounceOwnership",
-        "outputs":  [
-
-                    ],
-        "stateMutability":  "nonpayable",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "uint256",
-                           "name":  "",
-                           "type":  "uint256"
-                       }
-                   ],
-        "name":  "slots",
-        "outputs":  [
-                        {
-                            "internalType":  "address",
-                            "name":  "developer",
-                            "type":  "address"
-                        },
-                        {
-                            "internalType":  "string",
-                            "name":  "siteName",
-                            "type":  "string"
-                        },
-                        {
-                            "internalType":  "string",
-                            "name":  "category",
-                            "type":  "string"
-                        },
-                        {
-                            "internalType":  "bool",
-                            "name":  "active",
-                            "type":  "bool"
-                        },
-                        {
-                            "internalType":  "uint256",
-                            "name":  "assignedCampaignId",
-                            "type":  "uint256"
-                        }
-                    ],
-        "stateMutability":  "view",
-        "type":  "function"
-    },
-    {
-        "inputs":  [
-                       {
-                           "internalType":  "address",
-                           "name":  "newOwner",
-                           "type":  "address"
-                       }
-                   ],
-        "name":  "transferOwnership",
-        "outputs":  [
-
-                    ],
-        "stateMutability":  "nonpayable",
-        "type":  "function"
-    }
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "initialOwner",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint8",
+        "name": "got",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint8",
+        "name": "expected",
+        "type": "uint8"
+      }
+    ],
+    "name": "InvalidEncryptedInput",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableInvalidOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "slotId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "campaignId",
+        "type": "uint256"
+      }
+    ],
+    "name": "CampaignAssignedToSlot",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "hoster",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "creativeURI",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "category",
+        "type": "string"
+      }
+    ],
+    "name": "CampaignCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "developer",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "siteName",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "category",
+        "type": "string"
+      }
+    ],
+    "name": "SlotRegistered",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "slotId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "campaignId",
+        "type": "uint256"
+      }
+    ],
+    "name": "assignCampaignToSlot",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      }
+    ],
+    "name": "campaignHoster",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "creativeURI",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "category",
+        "type": "string"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "ctHash",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint8",
+            "name": "securityZone",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint8",
+            "name": "utype",
+            "type": "uint8"
+          },
+          {
+            "internalType": "bytes",
+            "name": "signature",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct InEuint64",
+        "name": "budget",
+        "type": "tuple"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "ctHash",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint8",
+            "name": "securityZone",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint8",
+            "name": "utype",
+            "type": "uint8"
+          },
+          {
+            "internalType": "bytes",
+            "name": "signature",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct InEuint32",
+        "name": "cpc",
+        "type": "tuple"
+      }
+    ],
+    "name": "createCampaign",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      }
+    ],
+    "name": "getMyBudget",
+    "outputs": [
+      {
+        "internalType": "euint64",
+        "name": "encryptedBudget",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      }
+    ],
+    "name": "getMyCpc",
+    "outputs": [
+      {
+        "internalType": "euint32",
+        "name": "encryptedCpc",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      }
+    ],
+    "name": "getPublicInfo",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "creativeURI",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "category",
+        "type": "string"
+      },
+      {
+        "internalType": "bool",
+        "name": "active",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      }
+    ],
+    "name": "isCampaignActive",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "nextCampaignId",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "nextSlotId",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "siteName",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "category",
+        "type": "string"
+      }
+    ],
+    "name": "registerSlot",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "active",
+        "type": "bool"
+      }
+    ],
+    "name": "setCampaignActive",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "slots",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "developer",
+        "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "siteName",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "category",
+        "type": "string"
+      },
+      {
+        "internalType": "bool",
+        "name": "active",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "assignedCampaignId",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
 ]
