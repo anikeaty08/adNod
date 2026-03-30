@@ -22,6 +22,11 @@ function normalizeCampaign(campaign: Record<string, unknown>): CampaignMetadata 
   };
 }
 
+export interface AssistantChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export async function fetchCampaignMetadata(): Promise<CampaignMetadata[]> {
   const response = await fetch(`${API_URL}/api/campaigns`);
   if (!response.ok) throw new Error("Failed to load campaigns.");
@@ -50,13 +55,13 @@ export async function saveCampaignMetadata(campaign: CampaignMetadata): Promise<
   return normalizeCampaign(savedCampaign);
 }
 
-export async function askAdNodeAssistant(prompt: string): Promise<{ reply: string; model: string }> {
+export async function askAdNodeAssistant(prompt: string, history: AssistantChatTurn[] = []): Promise<{ reply: string; model: string }> {
   const response = await fetch(`${API_URL}/api/assistant`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt, history }),
   });
 
   if (!response.ok) {

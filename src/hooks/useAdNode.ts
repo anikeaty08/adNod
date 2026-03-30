@@ -22,7 +22,7 @@ export function useAdNode() {
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
   const { writeContractAsync, isPending } = useWriteContract();
-  const isConfigured = Boolean(adRegistryAddress && adAnalyticsAddress && import.meta.env.VITE_FHENIX_RPC_URL);
+  const isConfigured = Boolean(adRegistryAddress && adAnalyticsAddress);
 
   const assertConfigured = () => {
     if (!isConfigured) {

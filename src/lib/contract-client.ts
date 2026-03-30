@@ -9,6 +9,8 @@ import adAnalyticsAbi from "@/lib/abi/AdAnalytics.json";
 
 const chainId = Number(import.meta.env.VITE_CHAIN_ID || 421614);
 const rpcUrl = import.meta.env.VITE_FHENIX_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc";
+const defaultAdRegistryAddress = "0xd559D7bcE4A56fCdEE0C80a315eB568c4C841588";
+const defaultAdAnalyticsAddress = "0xAB6ea9d6d55353b25937d4A4dec55fe5aC9F6950";
 
 export const fhenixArbitrumSepolia = defineChain({
   id: chainId,
@@ -43,8 +45,8 @@ export const wagmiConfig = createConfig({
   },
 });
 
-export const adRegistryAddress = (import.meta.env.VITE_ADREGISTRY_ADDRESS || "") as Address;
-export const adAnalyticsAddress = (import.meta.env.VITE_ADANALYTICS_ADDRESS || "") as Address;
+export const adRegistryAddress = (import.meta.env.VITE_ADREGISTRY_ADDRESS || defaultAdRegistryAddress) as Address;
+export const adAnalyticsAddress = (import.meta.env.VITE_ADANALYTICS_ADDRESS || defaultAdAnalyticsAddress) as Address;
 
 export const adRegistryAbiTyped = adRegistryAbi;
 export const adAnalyticsAbiTyped = adAnalyticsAbi;

@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createCampaign, getCampaigns, getDatabaseReady, sanitizeCampaignMetadata } from "./campaign-store.js";
 import { parseMultipartUpload, uploadBufferToPinata } from "./pinata.js";
+import { getAssistantReply, type AssistantMessage } from "./assistant.js";
 
 const app = express();
 const allowedOrigins = new Set([
@@ -47,66 +48,21 @@ app.post("/api/campaigns", async (req, res) => {
 });
 
 app.post("/api/assistant", async (req, res) => {
-  const apiKey = process.env.GROQ_API_KEY;
+  const body = (req.body as Record<string, unknown>) ?? {};
+  const prompt = String(body.prompt ?? "").trim();
+  const history = Array.isArray(body.history) ? (body.history as AssistantMessage[]) : [];
 
-  if (!apiKey) {
-    res.status(503).json({ error: "Groq assistant is not configured yet." });
-    return;
-  }
-
-  const prompt = String((req.body as Record<string, unknown>)?.prompt ?? "").trim();
   if (!prompt) {
     res.status(400).json({ error: "Prompt is required." });
     return;
   }
 
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
-      messages: [
-        {
-          role: "system",
-          content:
-            [
-              "You are the AdNode AI assistant.",
-              "Use AdNode terminology correctly:",
-              "- Hoster = advertiser",
-              "- Developer = publisher",
-              "- Developers earn revenue by displaying campaigns, not Hosters.",
-              "AdNode is a decentralized advertising network on Fhenix Arbitrum Sepolia using CoFHE for encrypted financial data.",
-              "Public data: creative URI and category.",
-              "Encrypted data: budget, CPC, impressions, clicks, earnings.",
-              "Answer clearly, accurately, and briefly.",
-              "Do not invent features or mix up user roles.",
-              "If the user asks who earns from ad placements, the answer is Developers (publishers).",
-            ].join(" "),
-        },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.2,
-      max_completion_tokens: 300,
-    }),
-  });
-
-  if (!response.ok) {
-    res.status(502).json({ error: "Groq request failed." });
-    return;
+  try {
+    const completion = await getAssistantReply(prompt, history);
+    res.json(completion);
+  } catch (error) {
+    res.status(502).json({ error: error instanceof Error ? error.message : "Assistant request failed." });
   }
-
-  const completion = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-    model?: string;
-  };
-
-  res.json({
-    reply: completion.choices?.[0]?.message?.content ?? "",
-    model: completion.model ?? process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
-  });
 });
 
 app.post("/api/uploads/creative", async (req, res) => {
