@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import { createCampaign, getCampaigns, getDatabaseReady, sanitizeCampaignMetadata } from "./campaign-store";
+import { parseMultipartUpload, uploadBufferToPinata } from "./pinata";
 
 const app = express();
 const allowedOrigins = new Set([
@@ -93,6 +94,16 @@ app.post("/api/assistant", async (req, res) => {
     reply: completion.choices?.[0]?.message?.content ?? "",
     model: completion.model ?? process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
   });
+});
+
+app.post("/api/uploads/creative", async (req, res) => {
+  try {
+    const file = await parseMultipartUpload(req);
+    const uri = await uploadBufferToPinata(file);
+    res.status(201).json({ uri });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Creative upload failed." });
+  }
 });
 
 const port = Number(process.env.PORT || 4000);
