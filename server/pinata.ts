@@ -60,8 +60,11 @@ export async function uploadBufferToPinata(file: ParsedUpload) {
     throw new Error("Pinata credentials are not configured on the server.");
   }
 
+  const bytes = new Uint8Array(file.buffer.byteLength);
+  bytes.set(file.buffer);
+
   const formData = new FormData();
-  formData.append("file", new Blob([file.buffer], { type: file.mimeType }), file.filename);
+  formData.append("file", new Blob([bytes], { type: file.mimeType }), file.filename);
 
   const headers: Record<string, string> = {};
   if (jwt) {

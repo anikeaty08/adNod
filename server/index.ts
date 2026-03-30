@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express from "express";
-import { createCampaign, getCampaigns, getDatabaseReady, sanitizeCampaignMetadata } from "./campaign-store";
-import { parseMultipartUpload, uploadBufferToPinata } from "./pinata";
+import { createCampaign, getCampaigns, getDatabaseReady, sanitizeCampaignMetadata } from "./campaign-store.js";
+import { parseMultipartUpload, uploadBufferToPinata } from "./pinata.js";
 
 const app = express();
 const allowedOrigins = new Set([
@@ -72,11 +72,24 @@ app.post("/api/assistant", async (req, res) => {
         {
           role: "system",
           content:
-            "You are the AdNode AI assistant. Help users understand AdNode, FHE privacy, Hosters, Developers, campaigns, creatives, and platform workflow. Be concise, accurate, and product-aware.",
+            [
+              "You are the AdNode AI assistant.",
+              "Use AdNode terminology correctly:",
+              "- Hoster = advertiser",
+              "- Developer = publisher",
+              "- Developers earn revenue by displaying campaigns, not Hosters.",
+              "AdNode is a decentralized advertising network on Fhenix Arbitrum Sepolia using CoFHE for encrypted financial data.",
+              "Public data: creative URI and category.",
+              "Encrypted data: budget, CPC, impressions, clicks, earnings.",
+              "Answer clearly, accurately, and briefly.",
+              "Do not invent features or mix up user roles.",
+              "If the user asks who earns from ad placements, the answer is Developers (publishers).",
+            ].join(" "),
         },
         { role: "user", content: prompt },
       ],
-      temperature: 0.3,
+      temperature: 0.2,
+      max_completion_tokens: 300,
     }),
   });
 

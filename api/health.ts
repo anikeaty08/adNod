@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import "dotenv/config";
-import { getDatabaseReady } from "../server/campaign-store";
+import { getDatabaseReady } from "../server/campaign-store.js";
 
 export default async function handler(_req: IncomingMessage, res: ServerResponse) {
   const databaseReady = await getDatabaseReady();

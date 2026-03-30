@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import "dotenv/config";
-import { parseMultipartUpload, uploadBufferToPinata } from "../../server/pinata";
+import { parseMultipartUpload, uploadBufferToPinata } from "../../server/pinata.js";
 
 export const config = {
   api: {

@@ -1,5 +1,5 @@
-import { connectDatabase } from "./db";
-import { CampaignModel } from "./models/Campaign";
+import { connectDatabase } from "./db.js";
+import { CampaignModel } from "./models/Campaign.js";
 
 const memoryCampaigns: Record<string, unknown>[] = [];
 const metadataFields = ["chainCampaignId", "title", "description", "creativeURI", "category", "advertiser"] as const;

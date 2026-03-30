@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import "dotenv/config";
-import { createCampaign, getCampaigns, sanitizeCampaignMetadata } from "../server/campaign-store";
+import { createCampaign, getCampaigns, sanitizeCampaignMetadata } from "../server/campaign-store.js";
 
 async function readBody(req: IncomingMessage) {
   const chunks: Buffer[] = [];

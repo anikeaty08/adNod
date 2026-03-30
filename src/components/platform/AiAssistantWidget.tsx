@@ -84,7 +84,9 @@ export function AiAssistantWidget() {
           </div>
           <div className="mt-4 rounded-[24px] bg-white/70 p-4 dark:bg-white/5">
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Reply</p>
-            <p className="mt-3 whitespace-pre-wrap text-sm">{reply}</p>
+            <div className="mt-3 max-h-64 overflow-y-auto pr-1">
+              <p className="whitespace-pre-wrap text-sm">{reply}</p>
+            </div>
           </div>
         </div>
       ) : null}
