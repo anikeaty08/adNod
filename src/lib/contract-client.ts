@@ -1,7 +1,9 @@
 import { createConfig, http } from "wagmi";
 import { injected } from "wagmi/connectors";
-import { defineChain, type Address, type Hex, toHex } from "viem";
-import { FhenixClientSync, type Permit } from "fhenixjs-bundled";
+import { defineChain, type Address, createPublicClient, createWalletClient, custom, parseEther } from "viem";
+import { createCofheClient, createCofheConfig } from "@cofhe/sdk/web";
+import { arbSepolia } from "@cofhe/sdk/chains";
+import type { FheTypes } from "@cofhe/sdk";
 import adRegistryAbi from "@/lib/abi/AdRegistry.json";
 import adAnalyticsAbi from "@/lib/abi/AdAnalytics.json";
 
@@ -10,8 +12,8 @@ const rpcUrl = import.meta.env.VITE_FHENIX_RPC_URL || "https://sepolia-rollup.ar
 
 export const fhenixArbitrumSepolia = defineChain({
   id: chainId,
-  name: "Fhenix Arbitrum Sepolia",
-  network: "fhenix-arbitrum-sepolia",
+  name: "Arbitrum Sepolia",
+  network: "arbitrum-sepolia",
   nativeCurrency: {
     name: "ETH",
     symbol: "ETH",
@@ -23,6 +25,12 @@ export const fhenixArbitrumSepolia = defineChain({
     },
     public: {
       http: [rpcUrl],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: "Arbiscan",
+      url: "https://sepolia.arbiscan.io",
     },
   },
 });
@@ -41,35 +49,65 @@ export const adAnalyticsAddress = (import.meta.env.VITE_ADANALYTICS_ADDRESS || "
 export const adRegistryAbiTyped = adRegistryAbi;
 export const adAnalyticsAbiTyped = adAnalyticsAbi;
 
-let clientPromise: Promise<FhenixClientSync> | null = null;
+const cofheConfig = createCofheConfig({
+  supportedChains: [
+    {
+      ...arbSepolia,
+      id: chainId,
+      name: "Arbitrum Sepolia",
+    },
+  ],
+  useWorkers: true,
+});
 
-export async function getFhenixClient() {
+const cofheClient = createCofheClient(cofheConfig);
+
+export async function getCofheClient() {
   if (!window.ethereum) {
     throw new Error("No injected wallet provider found.");
   }
 
-  if (!clientPromise) {
-    clientPromise = FhenixClientSync.create({
-      provider: window.ethereum,
-      securityZones: [0],
-    });
+  const publicClient = createPublicClient({
+    chain: fhenixArbitrumSepolia,
+    transport: http(rpcUrl),
+  });
+  const walletClient = createWalletClient({
+    chain: fhenixArbitrumSepolia,
+    transport: custom(window.ethereum),
+  });
+
+  await cofheClient.connect(publicClient, walletClient);
+  return cofheClient;
+}
+
+export function encryptedInputToSolidity(value: {
+  ctHash: bigint | string;
+  securityZone: number;
+  utype: FheTypes;
+  signature: `0x${string}`;
+}) {
+  return {
+    ctHash: typeof value.ctHash === "string" ? BigInt(value.ctHash) : value.ctHash,
+    securityZone: value.securityZone,
+    utype: value.utype,
+    signature: value.signature,
+  };
+}
+
+export function formatBudgetToChainUnits(value: string) {
+  return parseEther(value);
+}
+
+export function getNetworkLabel(chainIdValue?: number | null) {
+  if (chainIdValue === 421614) {
+    return "Arbitrum Sepolia";
   }
 
-  return clientPromise;
-}
+  if (!chainIdValue) {
+    return null;
+  }
 
-export function encryptedInputToSolidity(value: { data: Uint8Array; securityZone: number }) {
-  return {
-    data: toHex(value.data) as Hex,
-    securityZone: value.securityZone,
-  };
-}
-
-export function extractPermissionForContract(permit: Permit) {
-  return {
-    publicKey: permit.publicKey as Hex,
-    signature: permit.signature as Hex,
-  };
+  return `Chain ${chainIdValue}`;
 }
 
 export function getIpfsGatewayUrl(uri: string) {

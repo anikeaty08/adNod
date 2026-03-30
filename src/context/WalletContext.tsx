@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo } from "react";
-import { useAccount, useChainId, useConnect } from "wagmi";
+import { useAccount, useChainId, useConnect, useDisconnect } from "wagmi";
+import { getNetworkLabel } from "@/lib/contract-client";
 
 interface WalletState {
   address: string | null;
@@ -8,6 +9,7 @@ interface WalletState {
   isConnecting: boolean;
   error: string | null;
   connect: () => Promise<void>;
+  disconnect: () => void;
 }
 
 const WalletContext = createContext<WalletState | undefined>(undefined);
@@ -16,11 +18,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { connectAsync, connectors, isPending, error } = useConnect();
+  const { disconnect } = useDisconnect();
 
   const value = useMemo(
     () => ({
       address: address ?? null,
-      network: chainId ? `0x${chainId.toString(16)}` : null,
+      network: getNetworkLabel(chainId),
       connected: isConnected,
       isConnecting: isPending,
       error: error?.message ?? null,
@@ -28,8 +31,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         if (!connectors.length) throw new Error("No wallet connector available.");
         await connectAsync({ connector: connectors[0] });
       },
+      disconnect,
     }),
-    [address, chainId, connectors, connectAsync, error?.message, isConnected, isPending],
+    [address, chainId, connectors, connectAsync, disconnect, error?.message, isConnected, isPending],
   );
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

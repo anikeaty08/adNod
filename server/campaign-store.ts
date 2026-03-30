@@ -2,23 +2,33 @@ import { connectDatabase } from "./db";
 import { CampaignModel } from "./models/Campaign";
 
 const memoryCampaigns: Record<string, unknown>[] = [];
+const metadataFields = ["chainCampaignId", "title", "description", "creativeURI", "category", "advertiser"] as const;
+
+export function sanitizeCampaignMetadata(payload: Record<string, unknown>) {
+  return metadataFields.reduce<Record<string, unknown>>((accumulator, field) => {
+    accumulator[field] = String(payload[field] ?? "");
+    return accumulator;
+  }, {});
+}
 
 export async function getCampaigns() {
   try {
     await connectDatabase();
-    return await CampaignModel.find().sort({ createdAt: -1 }).lean();
+    return await CampaignModel.find().sort({ createdAt: -1 }).select(metadataFields.join(" ")).lean();
   } catch {
     return memoryCampaigns;
   }
 }
 
 export async function createCampaign(payload: Record<string, unknown>) {
+  const sanitized = sanitizeCampaignMetadata(payload);
+
   try {
     await connectDatabase();
-    return await CampaignModel.create(payload);
+    return await CampaignModel.create(sanitized);
   } catch {
     const localCampaign = {
-      ...payload,
+      ...sanitized,
       _id: `local-${Date.now()}`,
       createdAt: new Date().toISOString(),
     };

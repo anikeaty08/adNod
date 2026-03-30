@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { CampaignForm } from "@/components/dashboard/CampaignForm";
 import { CampaignCard } from "@/components/dashboard/CampaignCard";
 import { PerformancePanel } from "@/components/dashboard/PerformancePanel";
@@ -10,8 +11,9 @@ import { useWallet } from "@/context/WalletContext";
 export function HosterDashboard() {
   const { data: campaigns = [] } = useCampaigns();
   const metrics = useCampaignMetrics(campaigns);
-  const { isConfigured } = useAdNode();
-  const { connected } = useWallet();
+  const { isConfigured, setCampaignActive } = useAdNode();
+  const { connected, address } = useWallet();
+  const [updatingCampaignId, setUpdatingCampaignId] = useState<number | null>(null);
   const hosterMetrics = [
     {
       label: "Campaigns created",
@@ -34,6 +36,15 @@ export function HosterDashboard() {
       hint: isConfigured ? "Only the campaign owner can decrypt stats." : "Add contract addresses and RPC before using encrypted analytics.",
     },
   ];
+
+  const handleToggleCampaign = async (campaignId: number, nextActive: boolean) => {
+    setUpdatingCampaignId(campaignId);
+    try {
+      await setCampaignActive(campaignId, nextActive);
+    } finally {
+      setUpdatingCampaignId(null);
+    }
+  };
 
   return (
     <section className="page-shell py-12 sm:py-16">
@@ -62,7 +73,15 @@ export function HosterDashboard() {
       ) : null}
       <div className="mt-8 grid gap-5">
         {campaigns.length ? (
-          campaigns.map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)
+          campaigns.map((campaign) => (
+            <CampaignCard
+              key={campaign.id}
+              campaign={campaign}
+              showControls={Boolean(address) && campaign.advertiser.toLowerCase() === address?.toLowerCase()}
+              onToggleActive={(campaignId, nextActive) => void handleToggleCampaign(campaignId, nextActive)}
+              isUpdating={updatingCampaignId === Number(campaign.id)}
+            />
+          ))
         ) : (
           <EmptyState
             title="No hoster campaigns yet"

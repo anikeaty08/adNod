@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import "dotenv/config";
-import { createCampaign, getCampaigns } from "../server/campaign-store";
+import { createCampaign, getCampaigns, sanitizeCampaignMetadata } from "../server/campaign-store";
 
 async function readBody(req: IncomingMessage) {
   const chunks: Buffer[] = [];
@@ -25,7 +25,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   if (req.method === "POST") {
     const payload = (await readBody(req)) as Record<string, unknown>;
-    const campaign = await createCampaign(payload);
+    const campaign = await createCampaign(sanitizeCampaignMetadata(payload));
     res.statusCode = 201;
     res.end(JSON.stringify(campaign));
     return;

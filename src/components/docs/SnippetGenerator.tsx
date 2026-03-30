@@ -2,67 +2,26 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/shared/Button";
 
 const snippets = {
-  html: `<script src="https://cdn.adnode.dev/embed.js"></script>
-<div id="adnode-slot" data-campaign="CMP-4021"></div>
-<script>
-  AdNode.mount({
-    slotId: "adnode-slot",
-    developer: "0xYourDeveloperWallet",
-    endpoint: "https://relay.adnode.dev"
-  });
-</script>`,
-  react: `import { useEffect } from "react";
-
-export function AdSlot() {
-  useEffect(() => {
-    window.AdNode?.mount({
-      slotId: "adnode-slot",
-      developer: "0xYourDeveloperWallet",
-      endpoint: "https://relay.adnode.dev",
-    });
-  }, []);
-
-  return <div id="adnode-slot" data-campaign="CMP-4021" />;
-}`,
-  nextjs: `"use client";
-import Script from "next/script";
-
-export default function AdNodeSlot() {
+  html: `<!-- SDK embed is not public yet -->
+<!-- Wave 3 will ship a same-origin AdNode slot loader -->
+<div data-adnode-slot="coming-soon"></div>`,
+  react: `export function AdSlotComingSoon() {
   return (
-    <>
-      <Script src="https://cdn.adnode.dev/embed.js" strategy="afterInteractive" />
-      <div id="adnode-slot" data-campaign="CMP-4021" />
-    </>
+    <div data-adnode-slot="coming-soon">
+      AdNode SDK is scheduled for Wave 3.
+    </div>
   );
 }`,
+  nextjs: `export default function AdNodeSlotComingSoon() {
+  return <div data-adnode-slot="coming-soon">SDK coming in Wave 3.</div>;
+}`,
   vue: `<template>
-  <div id="adnode-slot" data-campaign="CMP-4021" />
-</template>
-
-<script setup>
-import { onMounted } from "vue";
-
-onMounted(() => {
-  window.AdNode?.mount({
-    slotId: "adnode-slot",
-    developer: "0xYourDeveloperWallet",
-    endpoint: "https://relay.adnode.dev"
-  });
-});
-</script>`,
-  python: `from flask import Flask, render_template_string
-
-app = Flask(__name__)
-
-@app.get("/")
-def ad_slot():
-    return render_template_string("""
-    <script src='https://cdn.adnode.dev/embed.js'></script>
-    <div id='adnode-slot' data-campaign='CMP-4021'></div>
-    """)`,
+  <div data-adnode-slot="coming-soon">SDK coming in Wave 3.</div>
+</template>`,
+  python: `# SDK embed is not public yet.
+# Use the Developer dashboard to register slots until Wave 3 ships.`,
   php: `<?php
-echo "<script src='https://cdn.adnode.dev/embed.js'></script>";
-echo "<div id='adnode-slot' data-campaign='CMP-4021'></div>";
+echo "AdNode SDK is coming in Wave 3.";
 ?>`,
 };
 
@@ -77,7 +36,7 @@ export function SnippetGenerator() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h3 className="font-display text-2xl font-semibold">Integration snippet generator</h3>
-          <p className="mt-2 text-sm text-muted-foreground">Deliver ads in HTML, React, Next.js, Vue, Python, or PHP.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Preview the planned SDK shape without exposing fake endpoints or dead embed URLs.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {(Object.keys(snippets) as SnippetKey[]).map((key) => (
@@ -96,6 +55,7 @@ export function SnippetGenerator() {
       <pre className="mt-6 overflow-x-auto rounded-[28px] bg-slate-950 p-6 font-mono text-sm leading-6 text-sky-100">
         <code>{snippet}</code>
       </pre>
+      <p className="mt-4 text-sm text-muted-foreground">The live browser SDK is not public in this build yet, so these examples are intentionally marked as coming soon.</p>
       <Button className="mt-5" onClick={() => void navigator.clipboard.writeText(snippet)}>
         Copy snippet
       </Button>

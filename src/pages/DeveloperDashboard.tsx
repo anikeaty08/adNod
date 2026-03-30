@@ -6,7 +6,7 @@ import { useCampaignMetrics, useCampaigns } from "@/hooks/useCampaigns";
 import { Button } from "@/components/shared/Button";
 import { useAdNode } from "@/hooks/useAdNode";
 import { useWallet } from "@/context/WalletContext";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 export function DeveloperDashboard() {
   const { data: campaigns = [] } = useCampaigns();
@@ -15,8 +15,14 @@ export function DeveloperDashboard() {
   const { connected } = useWallet();
   const [siteName, setSiteName] = useState("");
   const [category, setCategory] = useState("");
+  const [filterCategory, setFilterCategory] = useState("all");
   const [earnings, setEarnings] = useState<string | null>(null);
   const [status, setStatus] = useState("Register your ad slot on-chain and decrypt earnings when they accrue.");
+  const categories = useMemo(() => Array.from(new Set(campaigns.map((campaign) => campaign.category))).sort(), [campaigns]);
+  const filteredCampaigns = useMemo(
+    () => campaigns.filter((campaign) => filterCategory === "all" || campaign.category === filterCategory),
+    [campaigns, filterCategory],
+  );
   const developerMetrics = [
     {
       label: "Open campaigns",
@@ -145,12 +151,33 @@ export function DeveloperDashboard() {
         </div>
       ) : null}
       <div className="mt-8 grid gap-5">
-        {campaigns.length ? (
-          campaigns.map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)
+        <div className="flex justify-end">
+          <label className="w-full max-w-xs space-y-2 text-sm">
+            <span>Filter by category</span>
+            <select
+              className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
+              value={filterCategory}
+              onChange={(event) => setFilterCategory(event.target.value)}
+            >
+              <option value="all">All categories</option>
+              {categories.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {filteredCampaigns.length ? (
+          filteredCampaigns.map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)
         ) : (
           <EmptyState
             title="No developer listings yet"
-            description="Once hosters create campaigns, available opportunities will show here for publishers to review and integrate."
+            description={
+              campaigns.length
+                ? "No campaigns match the selected category yet."
+                : "Once hosters create campaigns, available opportunities will show here for publishers to review and integrate."
+            }
           />
         )}
       </div>

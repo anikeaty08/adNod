@@ -1,6 +1,6 @@
 import "dotenv/config";
 import express from "express";
-import { createCampaign, getCampaigns, getDatabaseReady } from "./campaign-store";
+import { createCampaign, getCampaigns, getDatabaseReady, sanitizeCampaignMetadata } from "./campaign-store";
 
 const app = express();
 const allowedOrigins = new Set([
@@ -41,8 +41,58 @@ app.get("/api/campaigns", async (_req, res) => {
 });
 
 app.post("/api/campaigns", async (req, res) => {
-  const campaign = await createCampaign(req.body as Record<string, unknown>);
+  const campaign = await createCampaign(sanitizeCampaignMetadata(req.body as Record<string, unknown>));
   res.status(201).json(campaign);
+});
+
+app.post("/api/assistant", async (req, res) => {
+  const apiKey = process.env.GROQ_API_KEY;
+
+  if (!apiKey) {
+    res.status(503).json({ error: "Groq assistant is not configured yet." });
+    return;
+  }
+
+  const prompt = String((req.body as Record<string, unknown>)?.prompt ?? "").trim();
+  if (!prompt) {
+    res.status(400).json({ error: "Prompt is required." });
+    return;
+  }
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are the AdNode AI assistant. Help users understand AdNode, FHE privacy, Hosters, Developers, campaigns, creatives, and platform workflow. Be concise, accurate, and product-aware.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.3,
+    }),
+  });
+
+  if (!response.ok) {
+    res.status(502).json({ error: "Groq request failed." });
+    return;
+  }
+
+  const completion = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    model?: string;
+  };
+
+  res.json({
+    reply: completion.choices?.[0]?.message?.content ?? "",
+    model: completion.model ?? process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+  });
 });
 
 const port = Number(process.env.PORT || 4000);

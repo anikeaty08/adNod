@@ -1,8 +1,19 @@
-import { PauseCircle, PlayCircle, Wallet } from "lucide-react";
+import { PauseCircle, PlayCircle, Square, Wallet } from "lucide-react";
 import type { ContractCampaign } from "@/lib/fhenix-contract";
 import { getIpfsGatewayUrl } from "@/lib/contract-client";
+import { Button } from "@/components/shared/Button";
 
-export function CampaignCard({ campaign }: { campaign: ContractCampaign }) {
+export function CampaignCard({
+  campaign,
+  showControls = false,
+  onToggleActive,
+  isUpdating = false,
+}: {
+  campaign: ContractCampaign;
+  showControls?: boolean;
+  onToggleActive?: (campaignId: number, nextActive: boolean) => void;
+  isUpdating?: boolean;
+}) {
   return (
     <div className="glass-panel rounded-[28px] p-6">
       <div className="flex items-start justify-between gap-3">
@@ -42,6 +53,23 @@ export function CampaignCard({ campaign }: { campaign: ContractCampaign }) {
         <Wallet className="h-4 w-4 text-sky-500" />
         {campaign.encryptedCpc ? `Decrypted CPC available` : "Financial data remains encrypted on-chain"}
       </div>
+      {showControls ? (
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => onToggleActive?.(Number(campaign.id), campaign.status !== "active")}
+            disabled={isUpdating}
+          >
+            {campaign.status === "active" ? "Pause campaign" : "Resume campaign"}
+          </Button>
+          <Button type="button" variant="ghost" disabled>
+            <Square className="mr-2 h-4 w-4" />
+            Stop campaign
+          </Button>
+          <p className="self-center text-xs text-muted-foreground">Stop control is coming soon while permanent close-out logic is finalized on-chain.</p>
+        </div>
+      ) : null}
     </div>
   );
 }

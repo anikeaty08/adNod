@@ -1,10 +1,19 @@
 import { useMemo } from "react";
+import { Encryptable, FheTypes } from "@cofhe/sdk";
 import { useAccount, useConnect, usePublicClient, useWalletClient, useWriteContract } from "wagmi";
 import { readContract } from "@wagmi/core";
 import { waitForTransactionReceipt } from "viem/actions";
-import { decodeEventLog, formatEther, parseEther } from "viem";
-import { EncryptionTypes } from "fhenixjs-bundled";
-import { wagmiConfig, adRegistryAbiTyped, adRegistryAddress, adAnalyticsAbiTyped, adAnalyticsAddress, encryptedInputToSolidity, extractPermissionForContract, getFhenixClient } from "@/lib/contract-client";
+import { decodeEventLog, formatEther } from "viem";
+import {
+  wagmiConfig,
+  adRegistryAbiTyped,
+  adRegistryAddress,
+  adAnalyticsAbiTyped,
+  adAnalyticsAddress,
+  encryptedInputToSolidity,
+  formatBudgetToChainUnits,
+  getCofheClient,
+} from "@/lib/contract-client";
 import { saveCampaignMetadata, fetchCampaignMetadata } from "@/lib/api";
 
 export function useAdNode() {
@@ -44,9 +53,12 @@ export function useAdNode() {
           throw new Error("Wallet is not connected.");
         }
 
-        const fhenix = await getFhenixClient();
-        const encryptedBudget = await fhenix.encrypt_uint64(parseEther(params.budget).toString(16));
-        const encryptedCpc = await fhenix.encrypt(params.cpc, EncryptionTypes.uint32);
+        const cofheClient = await getCofheClient();
+        const [encryptedBudget, encryptedCpc] = await cofheClient
+          .encryptInputs([Encryptable.uint64(formatBudgetToChainUnits(params.budget)), Encryptable.uint32(BigInt(params.cpc))])
+          .setAccount(address)
+          .setChainId(walletClient.chain.id)
+          .execute();
 
         const hash = await writeContractAsync({
           address: adRegistryAddress,
@@ -55,8 +67,8 @@ export function useAdNode() {
           args: [
             params.creativeURI,
             params.category,
-            encryptedInputToSolidity(encryptedBudget),
-            encryptedInputToSolidity(encryptedCpc),
+            encryptedInputToSolidity(encryptedBudget as Parameters<typeof encryptedInputToSolidity>[0]),
+            encryptedInputToSolidity(encryptedCpc as Parameters<typeof encryptedInputToSolidity>[0]),
           ],
           chain: walletClient.chain,
           account: walletClient.account,
@@ -118,54 +130,71 @@ export function useAdNode() {
       },
       getMyStats: async (campaignId: number) => {
         assertConfigured();
-        if (!address) throw new Error("Wallet is not connected.");
+        if (!address || !walletClient) throw new Error("Wallet is not connected.");
 
-        const fhenix = await getFhenixClient();
-        const permit = await fhenix.generatePermit(adAnalyticsAddress);
-        const permission = extractPermissionForContract(permit);
+        const cofheClient = await getCofheClient();
+        await cofheClient.permits.getOrCreateSelfPermit(walletClient.chain.id, address);
         const result = (await readContract(wagmiConfig, {
           address: adAnalyticsAddress,
           abi: adAnalyticsAbiTyped,
           functionName: "getMyStats",
-          args: [BigInt(campaignId), permission],
-        })) as [string, string];
+          args: [BigInt(campaignId)],
+        })) as [bigint, bigint];
 
         return {
-          impressions: Number(fhenix.unseal(adAnalyticsAddress, result[0], address)),
-          clicks: Number(fhenix.unseal(adAnalyticsAddress, result[1], address)),
+          impressions: Number(
+            await cofheClient.decryptForView(result[0], FheTypes.Uint32).setAccount(address).setChainId(walletClient.chain.id).withPermit().execute(),
+          ),
+          clicks: Number(
+            await cofheClient.decryptForView(result[1], FheTypes.Uint32).setAccount(address).setChainId(walletClient.chain.id).withPermit().execute(),
+          ),
         };
       },
       getMyBudget: async (campaignId: number) => {
         assertConfigured();
-        if (!address) throw new Error("Wallet is not connected.");
+        if (!address || !walletClient) throw new Error("Wallet is not connected.");
 
-        const fhenix = await getFhenixClient();
-        const permit = await fhenix.generatePermit(adRegistryAddress);
-        const permission = extractPermissionForContract(permit);
+        const cofheClient = await getCofheClient();
+        await cofheClient.permits.getOrCreateSelfPermit(walletClient.chain.id, address);
         const result = (await readContract(wagmiConfig, {
           address: adRegistryAddress,
           abi: adRegistryAbiTyped,
           functionName: "getMyBudget",
-          args: [BigInt(campaignId), permission],
-        })) as string;
+          args: [BigInt(campaignId)],
+        })) as bigint;
 
-        return formatEther(fhenix.unseal(adRegistryAddress, result, address));
+        return formatEther(
+          await cofheClient.decryptForView(result, FheTypes.Uint64).setAccount(address).setChainId(walletClient.chain.id).withPermit().execute(),
+        );
       },
       getMyEarnings: async () => {
         assertConfigured();
-        if (!address) throw new Error("Wallet is not connected.");
+        if (!address || !walletClient) throw new Error("Wallet is not connected.");
 
-        const fhenix = await getFhenixClient();
-        const permit = await fhenix.generatePermit(adAnalyticsAddress);
-        const permission = extractPermissionForContract(permit);
+        const cofheClient = await getCofheClient();
+        await cofheClient.permits.getOrCreateSelfPermit(walletClient.chain.id, address);
         const result = (await readContract(wagmiConfig, {
           address: adAnalyticsAddress,
           abi: adAnalyticsAbiTyped,
           functionName: "getMyEarnings",
-          args: [permission],
-        })) as string;
+        })) as bigint;
 
-        return formatEther(fhenix.unseal(adAnalyticsAddress, result, address));
+        return formatEther(
+          await cofheClient.decryptForView(result, FheTypes.Uint64).setAccount(address).setChainId(walletClient.chain.id).withPermit().execute(),
+        );
+      },
+      setCampaignActive: async (campaignId: number, active: boolean) => {
+        assertConfigured();
+        if (!walletClient) throw new Error("Wallet is not connected.");
+
+        return writeContractAsync({
+          address: adRegistryAddress,
+          abi: adRegistryAbiTyped,
+          functionName: "setCampaignActive",
+          args: [BigInt(campaignId), active],
+          chain: walletClient.chain,
+          account: walletClient.account,
+        });
       },
       getPublicCampaigns: async () => {
         if (!isConfigured) {

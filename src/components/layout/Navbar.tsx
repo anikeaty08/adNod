@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
-import { Menu, Orbit } from "lucide-react";
+import { Menu, Orbit, X } from "lucide-react";
+import { useState } from "react";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { Button } from "@/components/shared/Button";
 import { useWallet } from "@/context/WalletContext";
@@ -15,7 +16,8 @@ const baseNavLinks = [
 
 export function Navbar() {
   const [location] = useLocation();
-  const { connected, address, connect, isConnecting } = useWallet();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const { connected, address, connect, disconnect, isConnecting } = useWallet();
   const { role } = useAuth();
   const navLinks = role ? [...baseNavLinks, { href: "/profile", label: "Profile" }] : baseNavLinks;
 
@@ -48,13 +50,23 @@ export function Navbar() {
         </nav>
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Button variant="ghost" className="md:hidden rounded-full px-3 py-3" aria-label="Open navigation">
-            <Menu className="h-4 w-4" />
+          <Button
+            variant="ghost"
+            className="md:hidden rounded-full px-3 py-3"
+            aria-label="Open navigation"
+            onClick={() => setMobileOpen((value) => !value)}
+          >
+            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </Button>
           {connected ? (
-            <div className="hidden rounded-full bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 dark:bg-sky-500/10 dark:text-sky-200 sm:block">
-              {truncateMiddle(address ?? "")}
-            </div>
+            <>
+              <div className="hidden rounded-full bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 dark:bg-sky-500/10 dark:text-sky-200 sm:block">
+                {truncateMiddle(address ?? "")}
+              </div>
+              <Button variant="secondary" className="hidden sm:inline-flex" onClick={() => disconnect()}>
+                Disconnect
+              </Button>
+            </>
           ) : (
             <Button className="hidden sm:inline-flex" onClick={() => void connect()} disabled={isConnecting}>
               {isConnecting ? "Connecting..." : "Connect Wallet"}
@@ -62,6 +74,42 @@ export function Navbar() {
           )}
         </div>
       </div>
+      {mobileOpen ? (
+        <div className="border-t border-white/20 bg-white/85 px-6 py-5 backdrop-blur-xl dark:border-white/5 dark:bg-slate-950/90 md:hidden">
+          <nav className="flex flex-col gap-2">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`rounded-2xl px-4 py-3 text-sm transition ${
+                  location === link.href
+                    ? "bg-sky-500 text-white"
+                    : "text-muted-foreground hover:bg-white/60 hover:text-foreground dark:hover:bg-white/5"
+                }`}
+                onClick={() => setMobileOpen(false)}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+          <div className="mt-4">
+            {connected ? (
+              <div className="space-y-3">
+                <div className="rounded-2xl bg-sky-50 px-4 py-3 text-sm font-medium text-sky-700 dark:bg-sky-500/10 dark:text-sky-200">
+                  {truncateMiddle(address ?? "")}
+                </div>
+                <Button variant="secondary" className="w-full" onClick={() => disconnect()}>
+                  Disconnect
+                </Button>
+              </div>
+            ) : (
+              <Button className="w-full" onClick={() => void connect()} disabled={isConnecting}>
+                {isConnecting ? "Connecting..." : "Connect Wallet"}
+              </Button>
+            )}
+          </div>
+        </div>
+      ) : null}
     </header>
   );
 }

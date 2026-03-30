@@ -4,7 +4,7 @@ import { useWallet } from "@/context/WalletContext";
 import { truncateMiddle } from "@/lib/utils";
 
 export function WalletConnectionModal() {
-  const { connected, address, network, connect, error, isConnecting } = useWallet();
+  const { connected, address, network, connect, disconnect, error, isConnecting } = useWallet();
 
   return (
     <div className="glass-panel rounded-[28px] p-7">
@@ -24,6 +24,9 @@ export function WalletConnectionModal() {
             Connected to {network}
           </div>
           <p className="mt-2 font-mono text-sm">{truncateMiddle(address ?? "")}</p>
+          <Button className="mt-4 w-full" variant="secondary" onClick={() => disconnect()}>
+            Disconnect wallet
+          </Button>
         </div>
       ) : (
         <>

@@ -2,14 +2,20 @@ import { useLocation } from "wouter";
 import { RoleCard } from "@/components/shared/RoleCard";
 import { WalletConnectionModal } from "@/components/shared/WalletConnectionModal";
 import { useAuth } from "@/context/AuthContext";
+import { useWallet } from "@/context/WalletContext";
 
 export function Login() {
   const [, navigate] = useLocation();
   const { setRole } = useAuth();
+  const { connected } = useWallet();
 
   const handleSelect = (role: "hoster" | "developer") => {
+    if (!connected) {
+      return;
+    }
+
     setRole(role);
-    navigate(role === "hoster" ? "/hoster" : "/developer");
+    navigate("/onboarding");
   };
 
   return (
@@ -31,6 +37,7 @@ export function Login() {
           />
         </div>
       </div>
+      {!connected ? <p className="mt-6 text-sm text-muted-foreground">Connect your wallet first, then choose the workspace you want to open.</p> : null}
     </section>
   );
 }

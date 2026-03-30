@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {FHE, euint32, euint64, inEuint32, inEuint64} from "@fhenixprotocol/contracts/FHE.sol";
-import {Permission, Permissioned} from "@fhenixprotocol/contracts/access/Permissioned.sol";
+import {FHE, euint32, euint64, InEuint32, InEuint64} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract AdRegistry is Permissioned, Ownable {
+contract AdRegistry is Ownable {
     struct Campaign {
         address hoster;
         string creativeURI;
@@ -38,17 +37,24 @@ contract AdRegistry is Permissioned, Ownable {
     function createCampaign(
         string calldata creativeURI,
         string calldata category,
-        inEuint64 calldata budget,
-        inEuint32 calldata cpc
+        InEuint64 calldata budget,
+        InEuint32 calldata cpc
     ) external returns (uint256 id) {
         id = nextCampaignId++;
+
+        euint64 encryptedBudget = FHE.asEuint64(budget);
+        euint32 encryptedCpc = FHE.asEuint32(cpc);
+        FHE.allowThis(encryptedBudget);
+        FHE.allow(encryptedBudget, msg.sender);
+        FHE.allowThis(encryptedCpc);
+        FHE.allow(encryptedCpc, msg.sender);
 
         campaigns[id] = Campaign({
             hoster: msg.sender,
             creativeURI: creativeURI,
             category: category,
-            budget: FHE.asEuint64(budget),
-            cpc: FHE.asEuint32(cpc),
+            budget: encryptedBudget,
+            cpc: encryptedCpc,
             active: true
         });
 
@@ -60,22 +66,16 @@ contract AdRegistry is Permissioned, Ownable {
         return (campaign.creativeURI, campaign.category, campaign.active);
     }
 
-    function getMyBudget(uint256 id, Permission memory permission)
-        external
-        view
-        onlyPermitted(permission, campaigns[id].hoster)
-        returns (string memory encryptedBudget)
-    {
-        return campaigns[id].budget.seal(permission.publicKey);
+    function getMyBudget(uint256 id) external view returns (euint64 encryptedBudget) {
+        Campaign storage campaign = campaigns[id];
+        require(campaign.hoster == msg.sender, "Not campaign owner");
+        return campaign.budget;
     }
 
-    function getMyCpc(uint256 id, Permission memory permission)
-        external
-        view
-        onlyPermitted(permission, campaigns[id].hoster)
-        returns (string memory encryptedCpc)
-    {
-        return campaigns[id].cpc.seal(permission.publicKey);
+    function getMyCpc(uint256 id) external view returns (euint32 encryptedCpc) {
+        Campaign storage campaign = campaigns[id];
+        require(campaign.hoster == msg.sender, "Not campaign owner");
+        return campaign.cpc;
     }
 
     function registerSlot(string calldata siteName, string calldata category) external returns (uint256 id) {
@@ -110,5 +110,11 @@ contract AdRegistry is Permissioned, Ownable {
 
     function isCampaignActive(uint256 id) external view returns (bool) {
         return campaigns[id].active;
+    }
+
+    function setCampaignActive(uint256 id, bool active) external {
+        Campaign storage campaign = campaigns[id];
+        require(campaign.hoster == msg.sender, "Not campaign owner");
+        campaign.active = active;
     }
 }

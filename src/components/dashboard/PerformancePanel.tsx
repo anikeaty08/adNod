@@ -30,7 +30,7 @@ export function PerformancePanel({ campaigns }: { campaigns: ContractCampaign[] 
     <div className="glass-panel rounded-[32px] p-7">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h3 className="font-display text-2xl font-semibold">Performance trend</h3>
+          <h3 className="font-display text-2xl font-semibold">Campaign stats</h3>
           <p className="mt-2 text-sm text-muted-foreground">Decrypt campaign budget and analytics from the Fhenix contracts when you need them.</p>
         </div>
         <div className="rounded-full bg-white/70 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-sky-700 dark:bg-white/5 dark:text-sky-200">

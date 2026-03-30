@@ -13,6 +13,7 @@ export interface UserProfile {
 interface AuthContextValue {
   role: UserRole;
   setRole: (role: Exclude<UserRole, null>) => void;
+  clearRole: () => void;
   profile: UserProfile | null;
   setProfile: (profile: UserProfile) => void;
 }
@@ -36,6 +37,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setRole: (nextRole: Exclude<UserRole, null>) => {
         localStorage.setItem("adnode:role", nextRole);
         setRoleState(nextRole);
+      },
+      clearRole: () => {
+        localStorage.removeItem("adnode:role");
+        setRoleState(null);
       },
       setProfile: (nextProfile: UserProfile) => {
         localStorage.setItem("adnode:profile", JSON.stringify(nextProfile));

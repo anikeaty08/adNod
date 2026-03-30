@@ -49,3 +49,19 @@ export async function saveCampaignMetadata(campaign: CampaignMetadata): Promise<
   const savedCampaign = (await response.json()) as Record<string, unknown>;
   return normalizeCampaign(savedCampaign);
 }
+
+export async function askAdNodeAssistant(prompt: string): Promise<{ reply: string; model: string }> {
+  const response = await fetch(`${API_URL}/api/assistant`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ prompt }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Assistant request failed.");
+  }
+
+  return (await response.json()) as { reply: string; model: string };
+}

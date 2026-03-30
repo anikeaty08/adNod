@@ -15,7 +15,7 @@ export function Onboarding() {
         <h1 className="mt-5 font-display text-4xl font-semibold">Your workspace is ready.</h1>
         <p className="mt-4 text-muted-foreground">
           Role: <span className="font-medium capitalize">{role ?? "developer"}</span>. Wallet:{" "}
-          <span className="font-mono text-sm">{address ?? "Connect from login"}</span>. Network: {network ?? "Fhenix Helium"}.
+          <span className="font-mono text-sm">{address ?? "Connect from login"}</span>. Network: {network ?? "Arbitrum Sepolia"}.
         </p>
         <div className="mt-8 grid gap-4 md:grid-cols-3">
           {[
@@ -23,7 +23,7 @@ export function Onboarding() {
               ? "You can now launch and manage campaigns from the Hoster workspace."
               : "You can now browse campaigns and work from the Developer workspace.",
             "Use the Profile page anytime to review account details and your activity history.",
-            "Wallet connection is used for access only here, without any signature prompt.",
+            "Encrypted budget and earnings decryption will ask for wallet permits only when you actively request those values.",
           ].map((item) => (
             <div key={item} className="rounded-[24px] bg-white/70 p-5 dark:bg-white/5">
               <p className="text-sm">{item}</p>

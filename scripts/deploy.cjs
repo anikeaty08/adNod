@@ -1,4 +1,5 @@
-const { ethers, network } = require("hardhat");
+const hre = require("hardhat");
+const { ethers, network } = hre;
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -23,6 +24,13 @@ async function main() {
   const deploymentDir = path.join(process.cwd(), "deployments");
   fs.mkdirSync(deploymentDir, { recursive: true });
   fs.writeFileSync(path.join(deploymentDir, `${network.name}.json`), JSON.stringify(deployment, null, 2));
+
+  const registryArtifact = await hre.artifacts.readArtifact("AdRegistry");
+  const analyticsArtifact = await hre.artifacts.readArtifact("AdAnalytics");
+  const abiDir = path.join(process.cwd(), "src", "lib", "abi");
+  fs.mkdirSync(abiDir, { recursive: true });
+  fs.writeFileSync(path.join(abiDir, "AdRegistry.json"), JSON.stringify(registryArtifact.abi, null, 2));
+  fs.writeFileSync(path.join(abiDir, "AdAnalytics.json"), JSON.stringify(analyticsArtifact.abi, null, 2));
 
   console.log(`AdRegistry deployed to ${deployment.adRegistry} on ${network.name}`);
   console.log(`AdAnalytics deployed to ${deployment.adAnalytics} on ${network.name}`);

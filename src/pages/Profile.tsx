@@ -45,11 +45,6 @@ export function Profile() {
         <div className="glass-panel rounded-[32px] p-7">
           <div className="flex items-center justify-between gap-4">
             <h2 className="font-display text-2xl font-semibold">Personal info</h2>
-            {role ? (
-              <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700 dark:bg-sky-500/10 dark:text-sky-200">
-                Current workspace: {role}
-              </span>
-            ) : null}
           </div>
 
           {!profile ? (

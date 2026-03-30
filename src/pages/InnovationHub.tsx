@@ -1,5 +1,65 @@
 import { SectionBadge } from "@/components/shared/SectionBadge";
 
+const faqs = [
+  {
+    question: "What is AdNode?",
+    answer:
+      "A decentralized advertising network where campaign budgets, bids, and analytics are fully encrypted on-chain. Nobody sees your strategy except you.",
+  },
+  {
+    question: "What problem does AdNode solve?",
+    answer:
+      "On transparent blockchains your entire ad strategy is public. Competitors see your budget, bids, and performance in real time. AdNode fixes this cryptographically by sealing all financial data with FHE before it touches the chain.",
+  },
+  {
+    question: "What is FHE?",
+    answer:
+      "Fully Homomorphic Encryption. It lets smart contracts compute on encrypted data without ever decrypting it, so you keep blockchain guarantees without exposing financial strategy.",
+  },
+  {
+    question: "Who can see my campaign budget?",
+    answer:
+      "Only you. Budgets are encrypted before leaving your browser, remain encrypted on-chain, and are decrypted only when your wallet requests access.",
+  },
+  {
+    question: "Can competitors see my bids?",
+    answer:
+      "No. Bids are encrypted at submission and intended to resolve through encrypted comparisons, so losing bids are not publicly revealed.",
+  },
+  {
+    question: "What data is actually public?",
+    answer:
+      "Only the ad creative and campaign category are public. Financial data such as budget, CPC, impressions, clicks, and earnings stays sealed on-chain.",
+  },
+  {
+    question: "What blockchain is AdNode on?",
+    answer: "Fhenix on Arbitrum Sepolia, using the CoFHE stack for encrypted EVM-compatible contract logic.",
+  },
+  {
+    question: "Do I need a special wallet?",
+    answer: "No. A standard EVM wallet like MetaMask works as long as you switch to Arbitrum Sepolia.",
+  },
+  {
+    question: "How do publishers earn?",
+    answer:
+      "Publisher earnings are tracked as encrypted on-chain values. Developers decrypt their own earnings with their wallet when they want to inspect them.",
+  },
+  {
+    question: "How do I add an ad creative?",
+    answer:
+      "Upload an image or video file directly or paste a URL. AdNode pins supported uploads to IPFS and stores the resulting `ipfs://` URI with the campaign.",
+  },
+  {
+    question: "Is the auction fair?",
+    answer:
+      "The platform is designed around sealed FHE bids so front-running and bid sniping are prevented by encrypted comparisons instead of public bid disclosure.",
+  },
+  {
+    question: "Is AdNode open source?",
+    answer: "Yes. The contracts and frontend live in the AdNode GitHub repository.",
+  },
+];
+
 export function InnovationHub() {
   return (
     <section className="page-shell py-12 sm:py-16">
@@ -50,13 +110,13 @@ export function InnovationHub() {
           </div>
         </div>
       </div>
-      <div className="mt-8 glass-panel rounded-[32px] p-7">
-        <h3 className="font-display text-2xl font-semibold">Why this page exists</h3>
-        <p className="mt-4 max-w-4xl text-sm text-muted-foreground">
-          This section is no longer a generic tutorial or implementation checklist. It now explains what AdNode actually
-          does inside the product: onboarding users, separating Hoster and Developer journeys, supporting wallet-based
-          access, and giving each side a dedicated workspace for campaign execution.
-        </p>
+      <div className="mt-8 grid gap-4">
+        {faqs.map((item) => (
+          <div key={item.question} className="glass-panel rounded-[28px] p-6">
+            <h3 className="font-display text-xl font-semibold">{item.question}</h3>
+            <p className="mt-3 text-sm text-muted-foreground">{item.answer}</p>
+          </div>
+        ))}
       </div>
     </section>
   );

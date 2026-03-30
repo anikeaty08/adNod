@@ -17,11 +17,22 @@ export function Footer() {
           </div>
         </div>
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">Infrastructure</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">Links</p>
           <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-            <p>Escrow-backed campaign settlement</p>
-            <p>Wallet-provider onboarding</p>
-            <p>Responsive, blockchain-native UX</p>
+            <a className="hover:text-foreground" href="https://github.com/anikeaty08/adNod" target="_blank" rel="noreferrer">
+              GitHub repository
+            </a>
+            <a
+              className="hover:text-foreground"
+              href="https://sepolia.arbiscan.io/address/0x93f5A88d41060f5c3E046849d59363FbA87E9813"
+              target="_blank"
+              rel="noreferrer"
+            >
+              AdRegistry explorer
+            </a>
+            <a className="hover:text-foreground" href="https://cofhe-docs.fhenix.zone/" target="_blank" rel="noreferrer">
+              Fhenix CoFHE docs
+            </a>
           </div>
         </div>
       </div>

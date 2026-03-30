@@ -2,19 +2,19 @@ import type { CampaignInput } from "@/lib/fhenix-contract";
 
 export const tutorialCards = [
   {
-    title: "Launch your first encrypted campaign",
-    description: "Walk through wallet connection, escrow funding, and privacy-aware reporting.",
-    duration: "7 min",
+    title: "Encrypted campaigns live",
+    description: "Create a campaign on-chain, keep the creative public, and leave financial state encrypted under CoFHE permissions.",
+    duration: "Live now",
   },
   {
-    title: "Publish an ad slot in React, Next.js, or Vue",
-    description: "Embed AdNode widgets with framework-safe snippets and event signing.",
-    duration: "11 min",
+    title: "Developer slots open",
+    description: "Register publisher inventory on-chain and review marketplace demand while the public SDK is finalized.",
+    duration: "Live now",
   },
   {
-    title: "Fraud-resistant click attestations",
-    description: "Design signed impression and click relays that settle into escrow safely.",
-    duration: "9 min",
+    title: "SDK rollout tracked",
+    description: "The embed runtime and relay tooling are still in progress, so the docs page marks them clearly as Wave 3 work.",
+    duration: "Wave 3",
   },
 ];
 

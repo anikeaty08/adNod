@@ -17,14 +17,14 @@ export function Landing() {
             <SectionBadge>How it works</SectionBadge>
             <h2 className="section-title mt-5">Built for both performance buyers and monetizing builders.</h2>
             <p className="mt-4 text-muted-foreground">
-              Hosters launch escrow-funded campaigns while Developers plug in framework-ready slots that settle on verifiable traffic.
+              Hosters can launch encrypted campaigns today, while Developers can register slots and monitor marketplace demand as the delivery SDK rolls out in stages.
             </p>
           </div>
           <div className="grid gap-4 lg:col-span-2 sm:grid-cols-3">
             {[
               "Connect a Fhenix wallet and choose your role.",
-              "Create or integrate campaigns with signed ad events.",
-              "Settle MAS payouts automatically from escrow.",
+              "Create campaigns on-chain and store only the public metadata off-chain.",
+              "Decrypt budgets, campaign stats, and earnings only when your wallet requests them.",
             ].map((step, index) => (
               <div key={step} className="glass-panel rounded-[28px] p-6">
                 <p className="text-sm uppercase tracking-[0.2em] text-sky-700 dark:text-sky-300">Step 0{index + 1}</p>
@@ -42,7 +42,7 @@ export function Landing() {
               <h2 className="section-title mt-5">A decentralized ad stack that still feels like premium SaaS.</h2>
             </div>
             <p className="max-w-xl text-sm text-muted-foreground">
-              Privacy-preserving attribution, smooth operator workflows, and transparent settlement state for every campaign.
+              Confidential financial state on-chain, clear role-based workspaces, and honest product surfaces that only promise what is live today.
             </p>
           </div>
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">

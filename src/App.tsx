@@ -12,6 +12,32 @@ import { Marketplace } from "@/pages/Marketplace";
 import { InnovationHub } from "@/pages/InnovationHub";
 import { Docs } from "@/pages/Docs";
 import { Profile } from "@/pages/Profile";
+import { useWallet } from "@/context/WalletContext";
+import { useAuth } from "@/context/AuthContext";
+
+function ProtectedRoute({
+  expectedRole,
+  children,
+}: {
+  expectedRole: "hoster" | "developer";
+  children: React.ReactNode;
+}) {
+  const [, navigate] = useLocation();
+  const { connected } = useWallet();
+  const { role } = useAuth();
+
+  useEffect(() => {
+    if (!connected || role !== expectedRole) {
+      navigate("/login");
+    }
+  }, [connected, expectedRole, navigate, role]);
+
+  if (!connected || role !== expectedRole) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
 
 export default function App() {
   const [location] = useLocation();
@@ -44,8 +70,16 @@ export default function App() {
                 <Route path="/" component={Landing} />
                 <Route path="/login" component={Login} />
                 <Route path="/onboarding" component={Onboarding} />
-                <Route path="/hoster" component={HosterDashboard} />
-                <Route path="/developer" component={DeveloperDashboard} />
+                <Route path="/hoster">
+                  <ProtectedRoute expectedRole="hoster">
+                    <HosterDashboard />
+                  </ProtectedRoute>
+                </Route>
+                <Route path="/developer">
+                  <ProtectedRoute expectedRole="developer">
+                    <DeveloperDashboard />
+                  </ProtectedRoute>
+                </Route>
                 <Route path="/profile" component={Profile} />
                 <Route path="/marketplace" component={Marketplace} />
                 <Route path="/innovation-hub" component={InnovationHub} />
