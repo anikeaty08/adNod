@@ -9,7 +9,7 @@ export function Login() {
 
   const handleSelect = (role: "hoster" | "developer") => {
     setRole(role);
-    navigate("/onboarding");
+    navigate(role === "hoster" ? "/hoster" : "/developer");
   };
 
   return (

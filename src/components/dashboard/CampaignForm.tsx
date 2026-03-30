@@ -48,7 +48,7 @@ export function CampaignForm() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h3 className="font-display text-2xl font-semibold">Create campaign</h3>
-          <p className="mt-2 text-sm text-muted-foreground">Define creative, pricing model, and MAS escrow in one flow.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Add campaign details, budget, and pricing for your live listing.</p>
         </div>
         <div className="rounded-full bg-sky-100 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-sky-700 dark:bg-sky-500/10 dark:text-sky-200">
           Hoster console
@@ -58,21 +58,38 @@ export function CampaignForm() {
         <div className="grid gap-4 lg:grid-cols-2">
           <label className="space-y-2 text-sm">
             <span>Campaign title</span>
-            <input className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50" {...form.register("title")} />
+            <input
+              className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
+              placeholder="Enter campaign title"
+              {...form.register("title")}
+            />
           </label>
           <label className="space-y-2 text-sm">
             <span>Creative URL</span>
-            <input className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50" {...form.register("creativeUrl")} />
+            <input
+              className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
+              placeholder="https://your-creative-url"
+              {...form.register("creativeUrl")}
+            />
           </label>
         </div>
         <label className="space-y-2 text-sm">
           <span>Description</span>
-          <textarea className="min-h-28 w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50" {...form.register("description")} />
+          <textarea
+            className="min-h-28 w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
+            placeholder="Describe the campaign goals, audience, and creative direction"
+            {...form.register("description")}
+          />
         </label>
         <div className="grid gap-4 lg:grid-cols-3">
           <label className="space-y-2 text-sm">
             <span>Budget (MAS)</span>
-            <input type="number" className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50" {...form.register("budget")} />
+            <input
+              type="number"
+              className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
+              placeholder="0"
+              {...form.register("budget")}
+            />
           </label>
           <label className="space-y-2 text-sm">
             <span>Pricing model</span>
@@ -84,7 +101,13 @@ export function CampaignForm() {
           </label>
           <label className="space-y-2 text-sm">
             <span>Rate (MAS)</span>
-            <input type="number" step="0.1" className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50" {...form.register("rate")} />
+            <input
+              type="number"
+              step="0.1"
+              className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
+              placeholder="0"
+              {...form.register("rate")}
+            />
           </label>
         </div>
         <FileUpload />

@@ -3,11 +3,9 @@ import { VideoHero } from "@/components/marketing/VideoHero";
 import { SectionBadge } from "@/components/shared/SectionBadge";
 import { tutorialCards } from "@/data/mock";
 import { useCampaigns } from "@/hooks/useCampaigns";
-import { formatCompact } from "@/lib/utils";
 
 export function Landing() {
   const { data: campaigns = [] } = useCampaigns();
-  const totalEscrow = campaigns.reduce((sum, campaign) => sum + campaign.escrowedMas, 0);
 
   return (
     <div className="pb-16">
@@ -49,10 +47,10 @@ export function Landing() {
           </div>
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {[
-              ["Campaigns saved", String(campaigns.length), "From the running AdNode API"],
-              ["Escrow tracked", `MAS ${formatCompact(totalEscrow)}`, "Computed from campaign records"],
-              ["Publishers ready", campaigns.length ? "Open marketplace" : "Waiting for first campaign", "Becomes useful after onboarding"],
-              ["Analytics state", campaigns.length ? "Live data only" : "No fake stats shown", "Dashboard now reflects stored records"],
+              ["Campaigns", String(campaigns.length), "Campaigns currently listed on AdNode"],
+              ["Publisher access", campaigns.length ? "Marketplace open" : "Waiting for first listing", "Developers browse live campaigns here"],
+              ["Profiles", "Hosters & Developers", "Role-based workspaces with guided onboarding"],
+              ["Settlement", "Escrow-backed", "Campaign funding and payout flow designed for on-chain execution"],
             ].map(([label, value, detail]) => (
               <div key={label} className="rounded-[26px] bg-white/80 p-5 dark:bg-white/5">
                 <p className="text-sm text-muted-foreground">{label}</p>

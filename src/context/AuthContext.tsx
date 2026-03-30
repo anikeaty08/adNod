@@ -2,9 +2,17 @@ import { createContext, useContext, useMemo, useState } from "react";
 
 export type UserRole = "hoster" | "developer" | null;
 
+export interface UserProfile {
+  displayName: string;
+  organization: string;
+  accountType: "creator" | "business" | "agency";
+}
+
 interface AuthContextValue {
   role: UserRole;
   setRole: (role: Exclude<UserRole, null>) => void;
+  profile: UserProfile | null;
+  setProfile: (profile: UserProfile) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -14,16 +22,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem("adnode:role");
     return stored === "hoster" || stored === "developer" ? stored : null;
   });
+  const [profile, setProfileState] = useState<UserProfile | null>(() => {
+    const stored = localStorage.getItem("adnode:profile");
+    return stored ? (JSON.parse(stored) as UserProfile) : null;
+  });
 
   const value = useMemo(
     () => ({
       role,
+      profile,
       setRole: (nextRole: Exclude<UserRole, null>) => {
         localStorage.setItem("adnode:role", nextRole);
         setRoleState(nextRole);
       },
+      setProfile: (nextProfile: UserProfile) => {
+        localStorage.setItem("adnode:profile", JSON.stringify(nextProfile));
+        setProfileState(nextProfile);
+      },
     }),
-    [role],
+    [profile, role],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

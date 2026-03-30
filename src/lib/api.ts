@@ -1,6 +1,6 @@
 import type { ContractCampaign } from "@/lib/fhenix-contract";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:4000";
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "" : "http://127.0.0.1:4000");
 
 function normalizeCampaign(campaign: Record<string, unknown>): ContractCampaign {
   return {

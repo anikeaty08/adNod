@@ -11,6 +11,7 @@ import { DeveloperDashboard } from "@/pages/DeveloperDashboard";
 import { Marketplace } from "@/pages/Marketplace";
 import { InnovationHub } from "@/pages/InnovationHub";
 import { Docs } from "@/pages/Docs";
+import { Profile } from "@/pages/Profile";
 
 export default function App() {
   const [location] = useLocation();
@@ -45,6 +46,7 @@ export default function App() {
                 <Route path="/onboarding" component={Onboarding} />
                 <Route path="/hoster" component={HosterDashboard} />
                 <Route path="/developer" component={DeveloperDashboard} />
+                <Route path="/profile" component={Profile} />
                 <Route path="/marketplace" component={Marketplace} />
                 <Route path="/innovation-hub" component={InnovationHub} />
                 <Route path="/docs" component={Docs} />

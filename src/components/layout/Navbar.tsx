@@ -3,18 +3,21 @@ import { Menu, Orbit } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { Button } from "@/components/shared/Button";
 import { useWallet } from "@/context/WalletContext";
+import { useAuth } from "@/context/AuthContext";
 import { truncateMiddle } from "@/lib/utils";
 
-const navLinks = [
+const baseNavLinks = [
   { href: "/", label: "Home" },
   { href: "/marketplace", label: "Marketplace" },
   { href: "/docs", label: "Docs" },
-  { href: "/innovation-hub", label: "Innovation Hub" },
+  { href: "/innovation-hub", label: "Platform" },
 ];
 
 export function Navbar() {
   const [location] = useLocation();
   const { connected, address, connect, isConnecting } = useWallet();
+  const { role } = useAuth();
+  const navLinks = role ? [...baseNavLinks, { href: "/profile", label: "Profile" }] : baseNavLinks;
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/20 bg-white/55 backdrop-blur-xl dark:border-white/5 dark:bg-slate-950/45">
