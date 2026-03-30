@@ -14,6 +14,7 @@ export function HosterDashboard() {
   const { isConfigured, setCampaignActive } = useAdNode();
   const { connected, address } = useWallet();
   const [updatingCampaignId, setUpdatingCampaignId] = useState<number | null>(null);
+  const ownedCampaigns = address ? campaigns.filter((campaign) => campaign.advertiser.toLowerCase() === address.toLowerCase()) : [];
   const hosterMetrics = [
     {
       label: "Campaigns created",
@@ -64,7 +65,7 @@ export function HosterDashboard() {
       </div>
       <div className="mt-8 grid gap-8 xl:grid-cols-[1.05fr_0.95fr]">
         <CampaignForm />
-        <PerformancePanel campaigns={campaigns} />
+        <PerformancePanel campaigns={ownedCampaigns} />
       </div>
       {!isConfigured ? (
         <div className="mt-6 rounded-[28px] border border-amber-300/60 bg-amber-50/80 px-5 py-4 text-sm text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100">

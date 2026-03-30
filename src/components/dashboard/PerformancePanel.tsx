@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ContractCampaign } from "@/lib/fhenix-contract";
 import { Button } from "@/components/shared/Button";
 import { useAdNode } from "@/hooks/useAdNode";
@@ -7,22 +7,58 @@ export function PerformancePanel({ campaigns }: { campaigns: ContractCampaign[] 
   const { getMyStats, getMyBudget } = useAdNode();
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(campaigns[0] ? Number(campaigns[0].id) : null);
   const [status, setStatus] = useState("Encrypted analytics are hidden until you decrypt them.");
+  const [isDecryptingBudget, setIsDecryptingBudget] = useState(false);
+  const [isDecryptingStats, setIsDecryptingStats] = useState(false);
   const [stats, setStats] = useState<{ budget: string; impressions: number; clicks: number } | null>(null);
 
-  const handleDecrypt = async () => {
+  useEffect(() => {
+    if (!campaigns.length) {
+      setSelectedCampaignId(null);
+      return;
+    }
+
+    if (!selectedCampaignId || !campaigns.some((campaign) => Number(campaign.id) === selectedCampaignId)) {
+      setSelectedCampaignId(Number(campaigns[0].id));
+    }
+  }, [campaigns, selectedCampaignId]);
+
+  const handleDecryptBudget = async () => {
     if (!selectedCampaignId) return;
 
-    setStatus("Decrypting campaign analytics...");
+    setIsDecryptingBudget(true);
+    setStatus("Requesting wallet permit for campaign budget...");
     try {
-      const [budget, decryptedStats] = await Promise.all([getMyBudget(selectedCampaignId), getMyStats(selectedCampaignId)]);
+      const budget = await getMyBudget(selectedCampaignId);
       setStats({
         budget,
+        impressions: stats?.impressions ?? 0,
+        clicks: stats?.clicks ?? 0,
+      });
+      setStatus("Campaign budget decrypted with your wallet permit.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Decrypt failed — check you are the campaign owner");
+    } finally {
+      setIsDecryptingBudget(false);
+    }
+  };
+
+  const handleDecryptStats = async () => {
+    if (!selectedCampaignId) return;
+
+    setIsDecryptingStats(true);
+    setStatus("Requesting wallet permit for campaign stats...");
+    try {
+      const decryptedStats = await getMyStats(selectedCampaignId);
+      setStats({
+        budget: stats?.budget ?? "0",
         impressions: decryptedStats.impressions,
         clicks: decryptedStats.clicks,
       });
-      setStatus("Encrypted analytics decrypted with your wallet permit.");
+      setStatus("Campaign stats decrypted with your wallet permit.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Unable to decrypt analytics.");
+      setStatus(error instanceof Error ? error.message : "Decrypt failed — check you are the campaign owner");
+    } finally {
+      setIsDecryptingStats(false);
     }
   };
 
@@ -73,9 +109,14 @@ export function PerformancePanel({ campaigns }: { campaigns: ContractCampaign[] 
       </div>
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">{status}</p>
-        <Button type="button" onClick={() => void handleDecrypt()} disabled={!campaigns.length || !selectedCampaignId}>
-          Decrypt stats
-        </Button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Button type="button" variant="secondary" onClick={() => void handleDecryptBudget()} disabled={!campaigns.length || !selectedCampaignId || isDecryptingBudget}>
+            {isDecryptingBudget ? "Decrypting budget..." : "Decrypt budget"}
+          </Button>
+          <Button type="button" onClick={() => void handleDecryptStats()} disabled={!campaigns.length || !selectedCampaignId || isDecryptingStats}>
+            {isDecryptingStats ? "Decrypting stats..." : "Decrypt stats"}
+          </Button>
+        </div>
       </div>
     </div>
   );

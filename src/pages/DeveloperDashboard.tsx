@@ -18,6 +18,7 @@ export function DeveloperDashboard() {
   const [filterCategory, setFilterCategory] = useState("all");
   const [earnings, setEarnings] = useState<string | null>(null);
   const [status, setStatus] = useState("Register your ad slot on-chain and decrypt earnings when they accrue.");
+  const [isDecryptingEarnings, setIsDecryptingEarnings] = useState(false);
   const categories = useMemo(() => Array.from(new Set(campaigns.map((campaign) => campaign.category))).sort(), [campaigns]);
   const filteredCampaigns = useMemo(
     () => campaigns.filter((campaign) => filterCategory === "all" || campaign.category === filterCategory),
@@ -74,13 +75,16 @@ export function DeveloperDashboard() {
       return;
     }
 
-    setStatus("Decrypting your publisher earnings...");
+    setIsDecryptingEarnings(true);
+    setStatus("Requesting wallet permit for encrypted earnings...");
     try {
       const value = await getMyEarnings();
       setEarnings(value);
       setStatus("Encrypted earnings decrypted with your wallet permit.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Unable to decrypt earnings.");
+      setStatus(error instanceof Error ? error.message : "Decrypt failed — check you are using the correct developer wallet");
+    } finally {
+      setIsDecryptingEarnings(false);
     }
   };
 
@@ -136,8 +140,8 @@ export function DeveloperDashboard() {
               <Button type="button" onClick={() => void handleRegisterSlot()} disabled={!isConfigured}>
                 Register slot on-chain
               </Button>
-              <Button type="button" variant="secondary" onClick={() => void handleDecryptEarnings()} disabled={!isConfigured}>
-                Decrypt earnings
+              <Button type="button" variant="secondary" onClick={() => void handleDecryptEarnings()} disabled={!isConfigured || isDecryptingEarnings}>
+                {isDecryptingEarnings ? "Decrypting earnings..." : "Decrypt earnings"}
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">{status}</p>

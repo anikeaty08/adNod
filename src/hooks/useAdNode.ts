@@ -30,6 +30,25 @@ export function useAdNode() {
     }
   };
 
+  const toReadableDecryptError = (error: unknown, ownerMessage: string) => {
+    const message = error instanceof Error ? error.message : String(error);
+    const normalized = message.toLowerCase();
+
+    if (normalized.includes("not campaign owner") || normalized.includes("execution reverted")) {
+      return new Error(ownerMessage);
+    }
+
+    if (normalized.includes("user rejected") || normalized.includes("rejected")) {
+      return new Error("Decrypt cancelled — wallet signature was not approved.");
+    }
+
+    if (normalized.includes("permit")) {
+      return new Error("Decrypt failed — wallet permit could not be created.");
+    }
+
+    return new Error("Decrypt failed — please retry with the connected owner wallet.");
+  };
+
   return useMemo(
     () => ({
       address,
@@ -133,55 +152,87 @@ export function useAdNode() {
         if (!address || !walletClient) throw new Error("Wallet is not connected.");
 
         const cofheClient = await getCofheClient();
-        await cofheClient.permits.getOrCreateSelfPermit(walletClient.chain.id, address);
-        const result = (await readContract(wagmiConfig, {
-          address: adAnalyticsAddress,
-          abi: adAnalyticsAbiTyped,
-          functionName: "getMyStats",
-          args: [BigInt(campaignId)],
-        })) as [bigint, bigint];
+        try {
+          const result = (await readContract(wagmiConfig, {
+            address: adAnalyticsAddress,
+            abi: adAnalyticsAbiTyped,
+            functionName: "getMyStats",
+            args: [BigInt(campaignId)],
+          })) as [bigint, bigint];
+          const permit = await cofheClient.permits.getOrCreateSelfPermit(walletClient.chain.id, address);
 
-        return {
-          impressions: Number(
-            await cofheClient.decryptForView(result[0], FheTypes.Uint32).setAccount(address).setChainId(walletClient.chain.id).withPermit().execute(),
-          ),
-          clicks: Number(
-            await cofheClient.decryptForView(result[1], FheTypes.Uint32).setAccount(address).setChainId(walletClient.chain.id).withPermit().execute(),
-          ),
-        };
+          return {
+            impressions: Number(
+              await cofheClient
+                .decryptForView(result[0], FheTypes.Uint32)
+                .setAccount(address)
+                .setChainId(walletClient.chain.id)
+                .withPermit(permit)
+                .execute(),
+            ),
+            clicks: Number(
+              await cofheClient
+                .decryptForView(result[1], FheTypes.Uint32)
+                .setAccount(address)
+                .setChainId(walletClient.chain.id)
+                .withPermit(permit)
+                .execute(),
+            ),
+          };
+        } catch (error) {
+          throw toReadableDecryptError(error, "Decrypt failed — check you are the campaign owner");
+        }
       },
       getMyBudget: async (campaignId: number) => {
         assertConfigured();
         if (!address || !walletClient) throw new Error("Wallet is not connected.");
 
         const cofheClient = await getCofheClient();
-        await cofheClient.permits.getOrCreateSelfPermit(walletClient.chain.id, address);
-        const result = (await readContract(wagmiConfig, {
-          address: adRegistryAddress,
-          abi: adRegistryAbiTyped,
-          functionName: "getMyBudget",
-          args: [BigInt(campaignId)],
-        })) as bigint;
+        try {
+          const result = (await readContract(wagmiConfig, {
+            address: adRegistryAddress,
+            abi: adRegistryAbiTyped,
+            functionName: "getMyBudget",
+            args: [BigInt(campaignId)],
+          })) as bigint;
+          const permit = await cofheClient.permits.getOrCreateSelfPermit(walletClient.chain.id, address);
 
-        return formatEther(
-          await cofheClient.decryptForView(result, FheTypes.Uint64).setAccount(address).setChainId(walletClient.chain.id).withPermit().execute(),
-        );
+          return formatEther(
+            await cofheClient
+              .decryptForView(result, FheTypes.Uint64)
+              .setAccount(address)
+              .setChainId(walletClient.chain.id)
+              .withPermit(permit)
+              .execute(),
+          );
+        } catch (error) {
+          throw toReadableDecryptError(error, "Decrypt failed — check you are the campaign owner");
+        }
       },
       getMyEarnings: async () => {
         assertConfigured();
         if (!address || !walletClient) throw new Error("Wallet is not connected.");
 
         const cofheClient = await getCofheClient();
-        await cofheClient.permits.getOrCreateSelfPermit(walletClient.chain.id, address);
-        const result = (await readContract(wagmiConfig, {
-          address: adAnalyticsAddress,
-          abi: adAnalyticsAbiTyped,
-          functionName: "getMyEarnings",
-        })) as bigint;
+        try {
+          const result = (await readContract(wagmiConfig, {
+            address: adAnalyticsAddress,
+            abi: adAnalyticsAbiTyped,
+            functionName: "getMyEarnings",
+          })) as bigint;
+          const permit = await cofheClient.permits.getOrCreateSelfPermit(walletClient.chain.id, address);
 
-        return formatEther(
-          await cofheClient.decryptForView(result, FheTypes.Uint64).setAccount(address).setChainId(walletClient.chain.id).withPermit().execute(),
-        );
+          return formatEther(
+            await cofheClient
+              .decryptForView(result, FheTypes.Uint64)
+              .setAccount(address)
+              .setChainId(walletClient.chain.id)
+              .withPermit(permit)
+              .execute(),
+          );
+        } catch (error) {
+          throw toReadableDecryptError(error, "Decrypt failed — check you are using the correct developer wallet");
+        }
       },
       setCampaignActive: async (campaignId: number, active: boolean) => {
         assertConfigured();
