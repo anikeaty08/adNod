@@ -2,10 +2,12 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createCampaignOnChain, fundCampaignEscrow, type CampaignInput } from "@/lib/fhenix-contract";
+import type { CampaignInput } from "@/lib/fhenix-contract";
 import { Button } from "@/components/shared/Button";
 import { FileUpload } from "@/components/shared/FileUpload";
 import { defaultCampaignForm } from "@/data/mock";
+import { useCreateCampaign } from "@/hooks/useCampaigns";
+import { useWallet } from "@/context/WalletContext";
 
 const schema = z.object({
   title: z.string().min(3),
@@ -18,17 +20,27 @@ const schema = z.object({
 
 export function CampaignForm() {
   const [status, setStatus] = useState<string>("Ready to create a new campaign.");
+  const { address, connected } = useWallet();
+  const createCampaign = useCreateCampaign(address);
   const form = useForm<CampaignInput>({
     resolver: zodResolver(schema),
     defaultValues: defaultCampaignForm,
   });
 
   const onSubmit = form.handleSubmit(async (values) => {
+    if (!connected) {
+      setStatus("Connect your wallet provider before creating a campaign.");
+      return;
+    }
+
     setStatus("Registering campaign on AdNode...");
-    const campaign = await createCampaignOnChain(values);
-    const escrow = await fundCampaignEscrow(campaign.id, values.budget);
-    setStatus(`Campaign ${campaign.id} created. Escrow funded in tx ${escrow.txHash}.`);
-    form.reset(values);
+    try {
+      const campaign = await createCampaign.mutateAsync(values);
+      setStatus(`Campaign ${campaign.id} created and saved to the AdNode API.`);
+      form.reset(values);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Campaign creation failed.");
+    }
   });
 
   return (
@@ -78,7 +90,9 @@ export function CampaignForm() {
         <FileUpload />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">{status}</p>
-          <Button type="submit">Register & fund campaign</Button>
+          <Button type="submit" disabled={createCampaign.isPending}>
+            {createCampaign.isPending ? "Creating..." : "Register & fund campaign"}
+          </Button>
         </div>
       </form>
     </div>

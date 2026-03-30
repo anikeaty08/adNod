@@ -1,12 +1,17 @@
 import { Hero } from "@/components/marketing/Hero";
 import { VideoHero } from "@/components/marketing/VideoHero";
 import { SectionBadge } from "@/components/shared/SectionBadge";
-import { liveStats, tutorialCards } from "@/data/mock";
+import { tutorialCards } from "@/data/mock";
+import { useCampaigns } from "@/hooks/useCampaigns";
+import { formatCompact } from "@/lib/utils";
 
 export function Landing() {
+  const { data: campaigns = [] } = useCampaigns();
+  const totalEscrow = campaigns.reduce((sum, campaign) => sum + campaign.escrowedMas, 0);
+
   return (
     <div className="pb-16">
-      <Hero />
+      <Hero campaigns={campaigns} />
       <VideoHero />
       <section className="page-shell py-10">
         <div className="grid gap-6 lg:grid-cols-3">
@@ -43,11 +48,16 @@ export function Landing() {
             </p>
           </div>
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {liveStats.map((item) => (
-              <div key={item.label} className="rounded-[26px] bg-white/80 p-5 dark:bg-white/5">
-                <p className="text-sm text-muted-foreground">{item.label}</p>
-                <p className="mt-3 font-display text-2xl font-semibold">{item.value}</p>
-                <p className="mt-2 text-sm text-sky-600 dark:text-sky-300">{item.delta}</p>
+            {[
+              ["Campaigns saved", String(campaigns.length), "From the running AdNode API"],
+              ["Escrow tracked", `MAS ${formatCompact(totalEscrow)}`, "Computed from campaign records"],
+              ["Publishers ready", campaigns.length ? "Open marketplace" : "Waiting for first campaign", "Becomes useful after onboarding"],
+              ["Analytics state", campaigns.length ? "Live data only" : "No fake stats shown", "Dashboard now reflects stored records"],
+            ].map(([label, value, detail]) => (
+              <div key={label} className="rounded-[26px] bg-white/80 p-5 dark:bg-white/5">
+                <p className="text-sm text-muted-foreground">{label}</p>
+                <p className="mt-3 font-display text-2xl font-semibold">{value}</p>
+                <p className="mt-2 text-sm text-sky-600 dark:text-sky-300">{detail}</p>
               </div>
             ))}
           </div>

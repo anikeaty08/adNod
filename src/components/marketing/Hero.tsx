@@ -3,9 +3,21 @@ import { motion } from "framer-motion";
 import { ArrowRight, ShieldEllipsis, Sparkles } from "lucide-react";
 import { SectionBadge } from "@/components/shared/SectionBadge";
 import { Button } from "@/components/shared/Button";
-import { liveStats } from "@/data/mock";
+import type { ContractCampaign } from "@/lib/fhenix-contract";
+import { formatCompact } from "@/lib/utils";
 
-export function Hero() {
+export function Hero({ campaigns }: { campaigns: ContractCampaign[] }) {
+  const activeCampaigns = campaigns.filter((campaign) => campaign.status === "active").length;
+  const totalEscrow = campaigns.reduce((sum, campaign) => sum + campaign.escrowedMas, 0);
+  const totalDevelopers = new Set(campaigns.map((campaign) => campaign.advertiser)).size;
+  const totalClicks = campaigns.reduce((sum, campaign) => sum + campaign.clicks, 0);
+  const liveStats = [
+    { label: "Escrow Locked", value: `MAS ${formatCompact(totalEscrow)}`, delta: campaigns.length ? "Live" : "No campaigns yet" },
+    { label: "Active Campaigns", value: String(activeCampaigns), delta: campaigns.length ? "Synced from API" : "Create the first one" },
+    { label: "Wallets Participating", value: String(totalDevelopers), delta: campaigns.length ? "Advertisers onboarded" : "Waiting for first wallet" },
+    { label: "Tracked Clicks", value: formatCompact(totalClicks), delta: campaigns.length ? "Event totals" : "No event data yet" },
+  ];
+
   return (
     <section className="page-shell py-14 sm:py-20">
       <div className="grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
@@ -62,8 +74,12 @@ export function Hero() {
           </div>
           <div className="relative mt-4 rounded-[28px] bg-gradient-to-br from-sky-600 via-sky-500 to-cyan-400 p-6 text-white">
             <p className="text-sm uppercase tracking-[0.2em] text-white/70">Live settlement rail</p>
-            <p className="mt-3 font-display text-3xl font-semibold">89.4k MAS</p>
-            <p className="mt-2 text-sm text-white/80">Released automatically to developer wallets this week.</p>
+            <p className="mt-3 font-display text-3xl font-semibold">MAS {formatCompact(totalEscrow)}</p>
+            <p className="mt-2 text-sm text-white/80">
+              {campaigns.length
+                ? "Backed by campaigns currently saved in the AdNode API."
+                : "Settlement totals will appear here as soon as the first campaign is created."}
+            </p>
           </div>
         </motion.div>
       </div>

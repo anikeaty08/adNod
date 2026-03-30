@@ -1,7 +1,17 @@
-import { marketplaceCampaigns } from "@/data/mock";
+import type { ContractCampaign } from "@/lib/fhenix-contract";
 import { formatCompact } from "@/lib/utils";
+import { EmptyState } from "@/components/shared/EmptyState";
 
-export function CampaignTable() {
+export function CampaignTable({ campaigns }: { campaigns: ContractCampaign[] }) {
+  if (!campaigns.length) {
+    return (
+      <EmptyState
+        title="No campaigns available yet"
+        description="Create your first Hoster campaign and it will appear here for Developers to browse."
+      />
+    );
+  }
+
   return (
     <div className="glass-panel overflow-hidden rounded-[32px]">
       <div className="overflow-x-auto">
@@ -16,7 +26,7 @@ export function CampaignTable() {
             </tr>
           </thead>
           <tbody>
-            {marketplaceCampaigns.map((campaign) => (
+            {campaigns.map((campaign) => (
               <tr key={campaign.id} className="border-t border-white/20 dark:border-white/5">
                 <td className="px-6 py-5">
                   <p className="font-medium">{campaign.title}</p>

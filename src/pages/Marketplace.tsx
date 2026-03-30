@@ -1,7 +1,10 @@
 import { CampaignTable } from "@/components/marketplace/CampaignTable";
 import { SectionBadge } from "@/components/shared/SectionBadge";
+import { useCampaigns } from "@/hooks/useCampaigns";
 
 export function Marketplace() {
+  const { data: campaigns = [] } = useCampaigns();
+
   return (
     <section className="page-shell py-12 sm:py-16">
       <SectionBadge>Open marketplace</SectionBadge>
@@ -17,7 +20,7 @@ export function Marketplace() {
         </div>
       </div>
       <div className="mt-8">
-        <CampaignTable />
+        <CampaignTable campaigns={campaigns} />
       </div>
     </section>
   );

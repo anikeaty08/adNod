@@ -14,7 +14,7 @@ const navLinks = [
 
 export function Navbar() {
   const [location] = useLocation();
-  const { connected, address, connect } = useWallet();
+  const { connected, address, connect, isConnecting } = useWallet();
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/20 bg-white/55 backdrop-blur-xl dark:border-white/5 dark:bg-slate-950/45">
@@ -53,8 +53,8 @@ export function Navbar() {
               {truncateMiddle(address ?? "")}
             </div>
           ) : (
-            <Button className="hidden sm:inline-flex" onClick={() => void connect()}>
-              Connect Wallet
+            <Button className="hidden sm:inline-flex" onClick={() => void connect()} disabled={isConnecting}>
+              {isConnecting ? "Connecting..." : "Connect Wallet"}
             </Button>
           )}
         </div>

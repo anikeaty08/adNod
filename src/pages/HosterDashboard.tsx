@@ -1,10 +1,37 @@
 import { CampaignForm } from "@/components/dashboard/CampaignForm";
 import { CampaignCard } from "@/components/dashboard/CampaignCard";
 import { PerformancePanel } from "@/components/dashboard/PerformancePanel";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { StatsCard } from "@/components/shared/StatsCard";
-import { hosterMetrics, marketplaceCampaigns } from "@/data/mock";
+import { useCampaignMetrics, useCampaigns } from "@/hooks/useCampaigns";
+import { formatCompact } from "@/lib/utils";
 
 export function HosterDashboard() {
+  const { data: campaigns = [] } = useCampaigns();
+  const metrics = useCampaignMetrics(campaigns);
+  const hosterMetrics = [
+    {
+      label: "Campaigns created",
+      value: String(campaigns.length),
+      hint: campaigns.length ? "Saved in the AdNode API" : "No campaigns created yet",
+    },
+    {
+      label: "Active campaigns",
+      value: String(metrics.activeCount),
+      hint: campaigns.length ? "Currently available to publishers" : "Create and activate your first campaign",
+    },
+    {
+      label: "Escrow tracked",
+      value: `MAS ${formatCompact(metrics.totalEscrow)}`,
+      hint: "Computed from saved campaigns",
+    },
+    {
+      label: "Tracked clicks",
+      value: formatCompact(metrics.totalClicks),
+      hint: campaigns.length ? "Live campaign totals" : "Metrics appear after real events are recorded",
+    },
+  ];
+
   return (
     <section className="page-shell py-12 sm:py-16">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -23,12 +50,17 @@ export function HosterDashboard() {
       </div>
       <div className="mt-8 grid gap-8 xl:grid-cols-[1.05fr_0.95fr]">
         <CampaignForm />
-        <PerformancePanel />
+        <PerformancePanel campaigns={campaigns} />
       </div>
       <div className="mt-8 grid gap-5">
-        {marketplaceCampaigns.map((campaign) => (
-          <CampaignCard key={campaign.id} campaign={campaign} />
-        ))}
+        {campaigns.length ? (
+          campaigns.map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)
+        ) : (
+          <EmptyState
+            title="No hoster campaigns yet"
+            description="Use the form above after connecting your wallet provider. Newly created campaigns will appear here instead of demo records."
+          />
+        )}
       </div>
     </section>
   );

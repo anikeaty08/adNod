@@ -1,9 +1,16 @@
 import { motion } from "framer-motion";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export function IntroVideo({ onComplete }: { onComplete: () => void }) {
+  const completedRef = useRef(false);
+
   useEffect(() => {
-    const timeout = window.setTimeout(onComplete, 20_000);
+    const timeout = window.setTimeout(() => {
+      if (!completedRef.current) {
+        completedRef.current = true;
+        onComplete();
+      }
+    }, 20_000);
     return () => window.clearTimeout(timeout);
   }, [onComplete]);
 
@@ -14,7 +21,20 @@ export function IntroVideo({ onComplete }: { onComplete: () => void }) {
       transition={{ duration: 1.1, ease: "easeInOut" }}
       className="fixed inset-0 z-50 overflow-hidden bg-black"
     >
-      <video className="h-full w-full object-cover" src="/adnode-intro.mp4" autoPlay muted playsInline />
+      <video
+        className="h-full w-full object-cover"
+        src="/adnode-intro.mp4"
+        autoPlay
+        muted
+        playsInline
+        preload="auto"
+        onEnded={() => {
+          if (!completedRef.current) {
+            completedRef.current = true;
+            onComplete();
+          }
+        }}
+      />
     </motion.div>
   );
 }

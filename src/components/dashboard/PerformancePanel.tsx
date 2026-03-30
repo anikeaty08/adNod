@@ -1,7 +1,13 @@
-import { performanceSeries } from "@/data/mock";
+import type { ContractCampaign } from "@/lib/fhenix-contract";
 import { MiniBarChart } from "@/components/shared/MiniBarChart";
 
-export function PerformancePanel() {
+export function PerformancePanel({ campaigns }: { campaigns: ContractCampaign[] }) {
+  const chartCampaigns = campaigns.slice(0, 7);
+  const labels = chartCampaigns.map((campaign) => campaign.id);
+  const budgets = chartCampaigns.map((campaign) => campaign.escrowedMas);
+  const clicks = chartCampaigns.map((campaign) => campaign.clicks);
+  const impressions = chartCampaigns.map((campaign) => campaign.impressions);
+
   return (
     <div className="glass-panel rounded-[32px] p-7">
       <div className="flex items-end justify-between gap-4">
@@ -15,21 +21,26 @@ export function PerformancePanel() {
       </div>
       <div className="mt-8 grid gap-8 lg:grid-cols-3">
         <div>
-          <p className="mb-4 text-sm text-muted-foreground">Spend index</p>
-          <MiniBarChart values={performanceSeries.map((item) => item.spend)} />
+          <p className="mb-4 text-sm text-muted-foreground">Escrow by campaign</p>
+          <MiniBarChart values={budgets.length ? budgets : [0, 0, 0, 0]} />
         </div>
         <div>
           <p className="mb-4 text-sm text-muted-foreground">Clicks</p>
-          <MiniBarChart values={performanceSeries.map((item) => item.clicks)} color="from-cyan-400 to-sky-300" />
+          <MiniBarChart values={clicks.length ? clicks : [0, 0, 0, 0]} color="from-cyan-400 to-sky-300" />
         </div>
         <div>
           <p className="mb-4 text-sm text-muted-foreground">Impressions</p>
-          <MiniBarChart values={performanceSeries.map((item) => item.impressions)} color="from-blue-500 to-sky-400" />
+          <MiniBarChart values={impressions.length ? impressions : [0, 0, 0, 0]} color="from-blue-500 to-sky-400" />
         </div>
       </div>
-      <div className="mt-6 grid grid-cols-7 gap-2 text-center text-xs text-muted-foreground">
-        {performanceSeries.map((item) => (
-          <span key={item.label}>{item.label}</span>
+      <div
+        className="mt-6 grid gap-2 text-center text-xs text-muted-foreground"
+        style={{
+          gridTemplateColumns: `repeat(${(labels.length ? labels : ["New", "Data", "Will", "Appear"]).length}, minmax(0, 1fr))`,
+        }}
+      >
+        {(labels.length ? labels : ["New", "Data", "Will", "Appear"]).map((label) => (
+          <span key={label}>{label}</span>
         ))}
       </div>
     </div>
