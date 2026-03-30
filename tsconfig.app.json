@@ -13,7 +13,8 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "fhenixjs-bundled": ["./node_modules/fhenixjs/dist/fhenix.esm.js"]
     }
   },
   "include": ["src"]

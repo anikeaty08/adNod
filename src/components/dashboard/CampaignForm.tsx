@@ -6,22 +6,23 @@ import type { CampaignInput } from "@/lib/fhenix-contract";
 import { Button } from "@/components/shared/Button";
 import { FileUpload } from "@/components/shared/FileUpload";
 import { defaultCampaignForm } from "@/data/mock";
-import { useCreateCampaign } from "@/hooks/useCampaigns";
+import { useAdNode } from "@/hooks/useAdNode";
 import { useWallet } from "@/context/WalletContext";
 
 const schema = z.object({
   title: z.string().min(3),
   description: z.string().min(10),
-  creativeUrl: z.string().url(),
-  budget: z.coerce.number().positive(),
-  pricingModel: z.enum(["CPC", "CPM", "HYBRID"]),
-  rate: z.coerce.number().positive(),
+  creativeURI: z.string().min(1),
+  category: z.string().min(2),
+  budget: z.string().min(1),
+  pricingModel: z.enum(["CPC", "CPM"]),
+  rate: z.coerce.number().int().positive(),
 });
 
 export function CampaignForm() {
   const [status, setStatus] = useState<string>("Ready to create a new campaign.");
-  const { address, connected } = useWallet();
-  const createCampaign = useCreateCampaign(address);
+  const { connected } = useWallet();
+  const { createCampaign, isPending } = useAdNode();
   const form = useForm<CampaignInput>({
     resolver: zodResolver(schema),
     defaultValues: defaultCampaignForm,
@@ -33,11 +34,23 @@ export function CampaignForm() {
       return;
     }
 
+    if (values.pricingModel !== "CPC") {
+      setStatus("Only CPC campaigns are enabled until CPM logic is added on-chain.");
+      return;
+    }
+
     setStatus("Registering campaign on AdNode...");
     try {
-      const campaign = await createCampaign.mutateAsync(values);
-      setStatus(`Campaign ${campaign.id} created and saved to the AdNode API.`);
-      form.reset(values);
+      const result = await createCampaign({
+        creativeURI: values.creativeURI,
+        category: values.category,
+        budget: values.budget,
+        cpc: values.rate,
+        title: values.title,
+        description: values.description,
+      });
+      setStatus(`Campaign ${result.campaignId} submitted on-chain. Tx: ${result.hash}`);
+      form.reset(defaultCampaignForm);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Campaign creation failed.");
     }
@@ -65,14 +78,22 @@ export function CampaignForm() {
             />
           </label>
           <label className="space-y-2 text-sm">
-            <span>Creative URL</span>
+            <span>Creative URI</span>
             <input
               className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
-              placeholder="https://your-creative-url"
-              {...form.register("creativeUrl")}
+              placeholder="ipfs://..."
+              {...form.register("creativeURI")}
             />
           </label>
         </div>
+        <label className="space-y-2 text-sm">
+          <span>Category</span>
+          <input
+            className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
+            placeholder="DeFi, Gaming, Tooling..."
+            {...form.register("category")}
+          />
+        </label>
         <label className="space-y-2 text-sm">
           <span>Description</span>
           <textarea
@@ -85,9 +106,9 @@ export function CampaignForm() {
           <label className="space-y-2 text-sm">
             <span>Budget (MAS)</span>
             <input
-              type="number"
+              type="text"
               className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
-              placeholder="0"
+              placeholder="0.1"
               {...form.register("budget")}
             />
           </label>
@@ -96,7 +117,6 @@ export function CampaignForm() {
             <select className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50" {...form.register("pricingModel")}>
               <option value="CPC">CPC</option>
               <option value="CPM">CPM</option>
-              <option value="HYBRID">HYBRID</option>
             </select>
           </label>
           <label className="space-y-2 text-sm">
@@ -110,11 +130,16 @@ export function CampaignForm() {
             />
           </label>
         </div>
-        <FileUpload />
+        <FileUpload
+          onUploaded={(uri) => {
+            form.setValue("creativeURI", uri, { shouldValidate: true });
+            setStatus(`Creative uploaded to ${uri}`);
+          }}
+        />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">{status}</p>
-          <Button type="submit" disabled={createCampaign.isPending}>
-            {createCampaign.isPending ? "Creating..." : "Register & fund campaign"}
+          <Button type="submit" disabled={isPending}>
+            {isPending ? "Creating..." : "Create on-chain campaign"}
           </Button>
         </div>
       </form>

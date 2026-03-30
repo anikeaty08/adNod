@@ -3,10 +3,15 @@ require("dotenv/config");
 
 /** @type {import("hardhat/config").HardhatUserConfig} */
 module.exports = {
-  solidity: "0.8.24",
+  solidity: {
+    version: "0.8.28",
+    settings: {
+      evmVersion: "cancun",
+    },
+  },
   networks: {
-    arbitrumSepolia: {
-      url: process.env.ARBITRUM_SEPOLIA_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc",
+    fhenixArbitrumSepolia: {
+      url: process.env.VITE_FHENIX_RPC_URL || process.env.ARBITRUM_SEPOLIA_RPC_URL || "",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
   },

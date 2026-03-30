@@ -4,18 +4,16 @@ import { ArrowRight, ShieldEllipsis, Sparkles } from "lucide-react";
 import { SectionBadge } from "@/components/shared/SectionBadge";
 import { Button } from "@/components/shared/Button";
 import type { ContractCampaign } from "@/lib/fhenix-contract";
-import { formatCompact } from "@/lib/utils";
 
 export function Hero({ campaigns }: { campaigns: ContractCampaign[] }) {
   const activeCampaigns = campaigns.filter((campaign) => campaign.status === "active").length;
-  const totalEscrow = campaigns.reduce((sum, campaign) => sum + campaign.escrowedMas, 0);
-  const totalDevelopers = new Set(campaigns.map((campaign) => campaign.advertiser)).size;
-  const totalClicks = campaigns.reduce((sum, campaign) => sum + campaign.clicks, 0);
+  const totalHosters = new Set(campaigns.map((campaign) => campaign.advertiser).filter(Boolean)).size;
+  const categories = new Set(campaigns.map((campaign) => campaign.category).filter(Boolean)).size;
   const liveStats = [
-    { label: "Escrow Locked", value: `MAS ${formatCompact(totalEscrow)}`, delta: campaigns.length ? "Live" : "No campaigns yet" },
-    { label: "Active Campaigns", value: String(activeCampaigns), delta: campaigns.length ? "Synced from API" : "Create the first one" },
-    { label: "Wallets Participating", value: String(totalDevelopers), delta: campaigns.length ? "Advertisers onboarded" : "Waiting for first wallet" },
-    { label: "Tracked Clicks", value: formatCompact(totalClicks), delta: campaigns.length ? "Event totals" : "No event data yet" },
+    { label: "Live campaigns", value: String(campaigns.length), delta: campaigns.length ? "Read from AdRegistry" : "Contract feed is empty" },
+    { label: "Active campaigns", value: String(activeCampaigns), delta: campaigns.length ? "Open for publisher slots" : "Create the first one" },
+    { label: "Hoster wallets", value: String(totalHosters), delta: campaigns.length ? "Unique campaign owners" : "Waiting for first wallet" },
+    { label: "Content categories", value: String(categories), delta: campaigns.length ? "Public campaign metadata" : "No categories yet" },
   ];
 
   return (
@@ -73,12 +71,12 @@ export function Hero({ campaigns }: { campaigns: ContractCampaign[] }) {
             ))}
           </div>
           <div className="relative mt-4 rounded-[28px] bg-gradient-to-br from-sky-600 via-sky-500 to-cyan-400 p-6 text-white">
-            <p className="text-sm uppercase tracking-[0.2em] text-white/70">Live settlement rail</p>
-            <p className="mt-3 font-display text-3xl font-semibold">MAS {formatCompact(totalEscrow)}</p>
+            <p className="text-sm uppercase tracking-[0.2em] text-white/70">Encrypted financial layer</p>
+            <p className="mt-3 font-display text-3xl font-semibold">Confidential by default</p>
             <p className="mt-2 text-sm text-white/80">
               {campaigns.length
-                ? "Backed by campaigns currently saved in the AdNode API."
-                : "Settlement totals will appear here as soon as the first campaign is created."}
+                ? "Budgets, bids, and analytics stay encrypted on-chain while creatives remain publicly discoverable."
+                : "Campaign counts will appear here after the first on-chain listing is created."}
             </p>
           </div>
         </motion.div>

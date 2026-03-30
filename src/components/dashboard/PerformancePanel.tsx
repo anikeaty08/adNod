@@ -1,47 +1,81 @@
+import { useState } from "react";
 import type { ContractCampaign } from "@/lib/fhenix-contract";
-import { MiniBarChart } from "@/components/shared/MiniBarChart";
+import { Button } from "@/components/shared/Button";
+import { useAdNode } from "@/hooks/useAdNode";
 
 export function PerformancePanel({ campaigns }: { campaigns: ContractCampaign[] }) {
-  const chartCampaigns = campaigns.slice(0, 7);
-  const labels = chartCampaigns.map((campaign) => campaign.id);
-  const budgets = chartCampaigns.map((campaign) => campaign.escrowedMas);
-  const clicks = chartCampaigns.map((campaign) => campaign.clicks);
-  const impressions = chartCampaigns.map((campaign) => campaign.impressions);
+  const { getMyStats, getMyBudget } = useAdNode();
+  const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(campaigns[0] ? Number(campaigns[0].id) : null);
+  const [status, setStatus] = useState("Encrypted analytics are hidden until you decrypt them.");
+  const [stats, setStats] = useState<{ budget: string; impressions: number; clicks: number } | null>(null);
+
+  const handleDecrypt = async () => {
+    if (!selectedCampaignId) return;
+
+    setStatus("Decrypting campaign analytics...");
+    try {
+      const [budget, decryptedStats] = await Promise.all([getMyBudget(selectedCampaignId), getMyStats(selectedCampaignId)]);
+      setStats({
+        budget,
+        impressions: decryptedStats.impressions,
+        clicks: decryptedStats.clicks,
+      });
+      setStatus("Encrypted analytics decrypted with your wallet permit.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to decrypt analytics.");
+    }
+  };
 
   return (
     <div className="glass-panel rounded-[32px] p-7">
       <div className="flex items-end justify-between gap-4">
         <div>
           <h3 className="font-display text-2xl font-semibold">Performance trend</h3>
-          <p className="mt-2 text-sm text-muted-foreground">Spend, clicks, and impression velocity over the last week.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Decrypt campaign budget and analytics from the Fhenix contracts when you need them.</p>
         </div>
         <div className="rounded-full bg-white/70 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-sky-700 dark:bg-white/5 dark:text-sky-200">
-          Live analytics
+          Encrypted analytics
         </div>
       </div>
-      <div className="mt-8 grid gap-8 lg:grid-cols-3">
-        <div>
-          <p className="mb-4 text-sm text-muted-foreground">Escrow by campaign</p>
-          <MiniBarChart values={budgets.length ? budgets : [0, 0, 0, 0]} />
-        </div>
-        <div>
-          <p className="mb-4 text-sm text-muted-foreground">Clicks</p>
-          <MiniBarChart values={clicks.length ? clicks : [0, 0, 0, 0]} color="from-cyan-400 to-sky-300" />
-        </div>
-        <div>
-          <p className="mb-4 text-sm text-muted-foreground">Impressions</p>
-          <MiniBarChart values={impressions.length ? impressions : [0, 0, 0, 0]} color="from-blue-500 to-sky-400" />
+      <div className="mt-8 space-y-4">
+        <label className="space-y-2 text-sm">
+          <span>Campaign</span>
+          <select
+            className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
+            value={selectedCampaignId ?? ""}
+            onChange={(event) => setSelectedCampaignId(Number(event.target.value))}
+          >
+            {campaigns.length ? (
+              campaigns.map((campaign) => (
+                <option key={campaign.id} value={campaign.id}>
+                  {campaign.title}
+                </option>
+              ))
+            ) : (
+              <option value="">No campaigns</option>
+            )}
+          </select>
+        </label>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-[24px] bg-white/70 p-5 dark:bg-white/5">
+            <p className="text-sm text-muted-foreground">Budget</p>
+            <p className="mt-3 font-display text-2xl font-semibold">{stats ? `${stats.budget} ETH` : "Locked"}</p>
+          </div>
+          <div className="rounded-[24px] bg-white/70 p-5 dark:bg-white/5">
+            <p className="text-sm text-muted-foreground">Impressions</p>
+            <p className="mt-3 font-display text-2xl font-semibold">{stats ? stats.impressions : "Locked"}</p>
+          </div>
+          <div className="rounded-[24px] bg-white/70 p-5 dark:bg-white/5">
+            <p className="text-sm text-muted-foreground">Clicks</p>
+            <p className="mt-3 font-display text-2xl font-semibold">{stats ? stats.clicks : "Locked"}</p>
+          </div>
         </div>
       </div>
-      <div
-        className="mt-6 grid gap-2 text-center text-xs text-muted-foreground"
-        style={{
-          gridTemplateColumns: `repeat(${(labels.length ? labels : ["New", "Data", "Will", "Appear"]).length}, minmax(0, 1fr))`,
-        }}
-      >
-        {(labels.length ? labels : ["New", "Data", "Will", "Appear"]).map((label) => (
-          <span key={label}>{label}</span>
-        ))}
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">{status}</p>
+        <Button type="button" onClick={() => void handleDecrypt()} disabled={!campaigns.length || !selectedCampaignId}>
+          Decrypt stats
+        </Button>
       </div>
     </div>
   );

@@ -3,11 +3,20 @@ import { SnippetGenerator } from "@/components/docs/SnippetGenerator";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StatsCard } from "@/components/shared/StatsCard";
 import { useCampaignMetrics, useCampaigns } from "@/hooks/useCampaigns";
-import { formatCompact } from "@/lib/utils";
+import { Button } from "@/components/shared/Button";
+import { useAdNode } from "@/hooks/useAdNode";
+import { useWallet } from "@/context/WalletContext";
+import { useState } from "react";
 
 export function DeveloperDashboard() {
   const { data: campaigns = [] } = useCampaigns();
   const metrics = useCampaignMetrics(campaigns);
+  const { registerSlot, getMyEarnings, isConfigured } = useAdNode();
+  const { connected } = useWallet();
+  const [siteName, setSiteName] = useState("");
+  const [category, setCategory] = useState("");
+  const [earnings, setEarnings] = useState<string | null>(null);
+  const [status, setStatus] = useState("Register your ad slot on-chain and decrypt earnings when they accrue.");
   const developerMetrics = [
     {
       label: "Open campaigns",
@@ -15,21 +24,59 @@ export function DeveloperDashboard() {
       hint: campaigns.length ? "Available for publisher integration" : "No open demand yet",
     },
     {
-      label: "Tracked impressions",
-      value: formatCompact(metrics.totalImpressions),
-      hint: campaigns.length ? "From stored campaign records" : "Will appear after real traffic",
+      label: "Categories live",
+      value: String(new Set(campaigns.map((campaign) => campaign.category)).size),
+      hint: campaigns.length ? "Public campaign tags from AdRegistry" : "No on-chain categories yet",
     },
     {
-      label: "Tracked clicks",
-      value: formatCompact(metrics.totalClicks),
-      hint: "Aggregated from live campaign data",
+      label: "Earnings visibility",
+      value: earnings ?? "Encrypted",
+      hint: connected ? "Click decrypt to reveal your payout balance." : "Connect your wallet to decrypt earnings.",
     },
     {
-      label: "Escrow supply",
-      value: `MAS ${formatCompact(metrics.totalEscrow)}`,
-      hint: campaigns.length ? "Available in listed campaigns" : "Awaiting first funded campaign",
+      label: "Slot registration",
+      value: connected ? "On-chain ready" : "Wallet required",
+      hint: isConfigured ? "Register publisher inventory directly in AdRegistry." : "Configure Fhenix env before publishing slots.",
     },
   ];
+
+  const handleRegisterSlot = async () => {
+    if (!connected) {
+      setStatus("Connect your wallet before registering a developer slot.");
+      return;
+    }
+
+    if (!siteName || !category) {
+      setStatus("Add a site name and category to register a slot.");
+      return;
+    }
+
+    setStatus("Registering slot on-chain...");
+    try {
+      const hash = await registerSlot(siteName, category);
+      setStatus(`Slot registered. Tx: ${hash}`);
+      setSiteName("");
+      setCategory("");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Slot registration failed.");
+    }
+  };
+
+  const handleDecryptEarnings = async () => {
+    if (!connected) {
+      setStatus("Connect your wallet before decrypting earnings.");
+      return;
+    }
+
+    setStatus("Decrypting your publisher earnings...");
+    try {
+      const value = await getMyEarnings();
+      setEarnings(value);
+      setStatus("Encrypted earnings decrypted with your wallet permit.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to decrypt earnings.");
+    }
+  };
 
   return (
     <section className="page-shell py-12 sm:py-16">
@@ -49,25 +96,54 @@ export function DeveloperDashboard() {
       </div>
       <div className="mt-8 grid gap-8 xl:grid-cols-[0.92fr_1.08fr]">
         <div className="glass-panel rounded-[32px] p-7">
-          <h3 className="font-display text-2xl font-semibold">Earnings release queue</h3>
-          {campaigns.length ? (
-            <div className="mt-6 space-y-4">
-              {campaigns.slice(0, 3).map((campaign) => (
-                <div key={campaign.id} className="rounded-[24px] bg-white/70 p-4 dark:bg-white/5">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-medium">{campaign.id}</p>
-                    <p className="text-sm text-sky-700 dark:text-sky-300">MAS {formatCompact(campaign.escrowedMas)}</p>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground capitalize">{campaign.status} campaign in the current marketplace feed.</p>
-                </div>
-              ))}
+          <h3 className="font-display text-2xl font-semibold">Publisher slot and earnings</h3>
+          <div className="mt-6 space-y-4">
+            <label className="block space-y-2 text-sm">
+              <span>Site name</span>
+              <input
+                className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
+                value={siteName}
+                onChange={(event) => setSiteName(event.target.value)}
+                placeholder="Your site or app name"
+              />
+            </label>
+            <label className="block space-y-2 text-sm">
+              <span>Category</span>
+              <input
+                className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                placeholder="Developer tooling, gaming, DeFi..."
+              />
+            </label>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-[24px] bg-white/70 p-4 dark:bg-white/5">
+                <p className="text-sm text-muted-foreground">Encrypted earnings</p>
+                <p className="mt-2 font-display text-2xl font-semibold">{earnings ?? "Locked"}</p>
+              </div>
+              <div className="rounded-[24px] bg-white/70 p-4 dark:bg-white/5">
+                <p className="text-sm text-muted-foreground">Slot state</p>
+                <p className="mt-2 font-medium">{connected ? "Ready to register" : "Connect wallet"}</p>
+              </div>
             </div>
-          ) : (
-            <p className="mt-6 text-sm text-muted-foreground">No payout queue yet. Campaign-backed earnings will appear after real hoster campaigns are added.</p>
-          )}
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button type="button" onClick={() => void handleRegisterSlot()} disabled={!isConfigured}>
+                Register slot on-chain
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => void handleDecryptEarnings()} disabled={!isConfigured}>
+                Decrypt earnings
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">{status}</p>
+          </div>
         </div>
         <SnippetGenerator />
       </div>
+      {!isConfigured ? (
+        <div className="mt-6 rounded-[28px] border border-amber-300/60 bg-amber-50/80 px-5 py-4 text-sm text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100">
+          Fhenix RPC or contract addresses are missing. Slot registration and encrypted earnings stay disabled until the Web3 environment is configured.
+        </div>
+      ) : null}
       <div className="mt-8 grid gap-5">
         {campaigns.length ? (
           campaigns.map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)

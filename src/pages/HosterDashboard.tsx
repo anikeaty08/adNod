@@ -4,16 +4,19 @@ import { PerformancePanel } from "@/components/dashboard/PerformancePanel";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StatsCard } from "@/components/shared/StatsCard";
 import { useCampaignMetrics, useCampaigns } from "@/hooks/useCampaigns";
-import { formatCompact } from "@/lib/utils";
+import { useAdNode } from "@/hooks/useAdNode";
+import { useWallet } from "@/context/WalletContext";
 
 export function HosterDashboard() {
   const { data: campaigns = [] } = useCampaigns();
   const metrics = useCampaignMetrics(campaigns);
+  const { isConfigured } = useAdNode();
+  const { connected } = useWallet();
   const hosterMetrics = [
     {
       label: "Campaigns created",
       value: String(campaigns.length),
-      hint: campaigns.length ? "Saved in the AdNode API" : "No campaigns created yet",
+      hint: campaigns.length ? "Read from AdRegistry with metadata from the API" : "No campaigns created yet",
     },
     {
       label: "Active campaigns",
@@ -21,14 +24,14 @@ export function HosterDashboard() {
       hint: campaigns.length ? "Currently available to publishers" : "Create and activate your first campaign",
     },
     {
-      label: "Escrow tracked",
-      value: `MAS ${formatCompact(metrics.totalEscrow)}`,
-      hint: "Computed from saved campaigns",
+      label: "Encrypted budgets",
+      value: campaigns.length ? "On-chain" : "Locked",
+      hint: connected ? "Decrypt a campaign budget from the panel below." : "Connect your wallet to decrypt campaign budgets.",
     },
     {
-      label: "Tracked clicks",
-      value: formatCompact(metrics.totalClicks),
-      hint: campaigns.length ? "Live campaign totals" : "Metrics appear after real events are recorded",
+      label: "Analytics access",
+      value: connected ? "Permit ready" : "Wallet required",
+      hint: isConfigured ? "Only the campaign owner can decrypt stats." : "Add contract addresses and RPC before using encrypted analytics.",
     },
   ];
 
@@ -52,6 +55,11 @@ export function HosterDashboard() {
         <CampaignForm />
         <PerformancePanel campaigns={campaigns} />
       </div>
+      {!isConfigured ? (
+        <div className="mt-6 rounded-[28px] border border-amber-300/60 bg-amber-50/80 px-5 py-4 text-sm text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100">
+          Fhenix RPC or contract addresses are missing. Campaign creation and analytics decryption stay disabled until the Web3 environment is configured.
+        </div>
+      ) : null}
       <div className="mt-8 grid gap-5">
         {campaigns.length ? (
           campaigns.map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)

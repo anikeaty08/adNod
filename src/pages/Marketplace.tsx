@@ -1,9 +1,11 @@
 import { CampaignTable } from "@/components/marketplace/CampaignTable";
 import { SectionBadge } from "@/components/shared/SectionBadge";
 import { useCampaigns } from "@/hooks/useCampaigns";
+import { useAdNode } from "@/hooks/useAdNode";
 
 export function Marketplace() {
   const { data: campaigns = [] } = useCampaigns();
+  const { isConfigured } = useAdNode();
 
   return (
     <section className="page-shell py-12 sm:py-16">
@@ -16,7 +18,7 @@ export function Marketplace() {
           </p>
         </div>
         <div className="rounded-[24px] bg-white/70 px-5 py-4 text-sm text-muted-foreground dark:bg-white/5">
-          Filters, sorting, and chain event sync hooks are ready to extend.
+          {isConfigured ? "Public listings come from AdRegistry. Financial metrics stay encrypted for owners only." : "Configure Fhenix RPC and contract addresses to load marketplace campaigns."}
         </div>
       </div>
       <div className="mt-8">

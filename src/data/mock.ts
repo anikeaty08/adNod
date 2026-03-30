@@ -21,8 +21,9 @@ export const tutorialCards = [
 export const defaultCampaignForm: CampaignInput = {
   title: "",
   description: "",
-  creativeUrl: "",
-  budget: 0,
+  creativeURI: "",
+  category: "",
+  budget: "",
   pricingModel: "CPC",
   rate: 0,
 };

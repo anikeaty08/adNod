@@ -1,5 +1,5 @@
-import { createContext, useContext, useMemo, useState } from "react";
-import { connectFhenixWallet } from "@/lib/fhenix-contract";
+import { createContext, useContext, useMemo } from "react";
+import { useAccount, useChainId, useConnect } from "wagmi";
 
 interface WalletState {
   address: string | null;
@@ -13,33 +13,23 @@ interface WalletState {
 const WalletContext = createContext<WalletState | undefined>(undefined);
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
-  const [address, setAddress] = useState<string | null>(null);
-  const [network, setNetwork] = useState<string | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const { connectAsync, connectors, isPending, error } = useConnect();
 
   const value = useMemo(
     () => ({
-      address,
-      network,
-      connected: Boolean(address),
-      isConnecting,
-      error,
+      address: address ?? null,
+      network: chainId ? `0x${chainId.toString(16)}` : null,
+      connected: isConnected,
+      isConnecting: isPending,
+      error: error?.message ?? null,
       connect: async () => {
-        setIsConnecting(true);
-        setError(null);
-        try {
-          const wallet = await connectFhenixWallet();
-          setAddress(wallet.address);
-          setNetwork(wallet.network);
-        } catch (walletError) {
-          setError(walletError instanceof Error ? walletError.message : "Wallet connection failed.");
-        } finally {
-          setIsConnecting(false);
-        }
+        if (!connectors.length) throw new Error("No wallet connector available.");
+        await connectAsync({ connector: connectors[0] });
       },
     }),
-    [address, error, isConnecting, network],
+    [address, chainId, connectors, connectAsync, error?.message, isConnected, isPending],
   );
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

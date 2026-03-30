@@ -3,9 +3,11 @@ import { createContext, useContext, useMemo, useState } from "react";
 export type UserRole = "hoster" | "developer" | null;
 
 export interface UserProfile {
-  displayName: string;
+  fullName: string;
+  email: string;
   organization: string;
-  accountType: "creator" | "business" | "agency";
+  country: string;
+  bio: string;
 }
 
 interface AuthContextValue {
