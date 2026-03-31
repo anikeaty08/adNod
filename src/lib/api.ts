@@ -1,4 +1,4 @@
-import type { ContractCampaign } from "@/lib/fhenix-contract";
+import type { ContractCampaign, SlotMetadata } from "@/lib/fhenix-contract";
 
 const isLocalPreview =
   typeof window !== "undefined" && (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost");
@@ -12,6 +12,12 @@ export interface CampaignMetadata {
   creativeURI: string;
   category: string;
   advertiser: string;
+}
+
+export interface PlatformStats {
+  totalCampaigns: number;
+  totalSlots: number;
+  totalVerifiedTransactions: number;
 }
 
 function normalizeCampaign(campaign: Record<string, unknown>): CampaignMetadata {
@@ -72,4 +78,49 @@ export async function askAdNodeAssistant(prompt: string, history: AssistantChatT
   }
 
   return (await response.json()) as { reply: string; model: string };
+}
+
+function normalizeSlot(slot: Record<string, unknown>): SlotMetadata {
+  return {
+    chainSlotId: String(slot.chainSlotId ?? ""),
+    siteName: String(slot.siteName ?? ""),
+    siteUrl: String(slot.siteUrl ?? ""),
+    category: String(slot.category ?? ""),
+    dailyTrafficEstimate: String(slot.dailyTrafficEstimate ?? ""),
+    developer: String(slot.developer ?? ""),
+    assignedCampaignId: String(slot.assignedCampaignId ?? ""),
+  };
+}
+
+export async function fetchSlots(): Promise<SlotMetadata[]> {
+  const response = await fetch(`${API_URL}/api/slots`);
+  if (!response.ok) throw new Error("Failed to load slots.");
+  const slots = (await response.json()) as Record<string, unknown>[];
+  return slots.map(normalizeSlot);
+}
+
+export async function saveSlot(slot: SlotMetadata): Promise<SlotMetadata> {
+  const response = await fetch(`${API_URL}/api/slots`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(slot),
+  });
+
+  if (!response.ok) throw new Error("Failed to save slot.");
+  return normalizeSlot((await response.json()) as Record<string, unknown>);
+}
+
+export async function updateSlotAssignment(chainSlotId: string, assignedCampaignId: string): Promise<SlotMetadata> {
+  const response = await fetch(`${API_URL}/api/slot?chainSlotId=${encodeURIComponent(chainSlotId)}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ assignedCampaignId }),
+  });
+
+  if (!response.ok) throw new Error("Failed to update slot assignment.");
+  return normalizeSlot((await response.json()) as Record<string, unknown>);
 }

@@ -4,7 +4,7 @@ import { useWallet } from "@/context/WalletContext";
 import { truncateMiddle } from "@/lib/utils";
 
 export function WalletConnectionModal() {
-  const { connected, address, network, connect, disconnect, error, isConnecting } = useWallet();
+  const { connected, address, network, connect, disconnect, error, isConnecting, isWrongNetwork, switchToArbitrumSepolia } = useWallet();
 
   return (
     <div className="glass-panel rounded-[28px] p-7">
@@ -24,6 +24,16 @@ export function WalletConnectionModal() {
             Connected to {network}
           </div>
           <p className="mt-2 font-mono text-sm">{truncateMiddle(address ?? "")}</p>
+          {isWrongNetwork ? (
+            <div className="mt-4 rounded-2xl bg-amber-100/80 px-4 py-3 text-sm text-amber-900 dark:bg-amber-500/15 dark:text-amber-100">
+              Wrong network detected. Switch to Arbitrum Sepolia before signing AdNode transactions.
+            </div>
+          ) : null}
+          {isWrongNetwork ? (
+            <Button className="mt-4 w-full" onClick={() => void switchToArbitrumSepolia()}>
+              Switch to Arbitrum Sepolia
+            </Button>
+          ) : null}
           <Button className="mt-4 w-full" variant="secondary" onClick={() => disconnect()}>
             Disconnect wallet
           </Button>

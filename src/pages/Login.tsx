@@ -15,7 +15,7 @@ export function Login() {
     }
 
     setRole(role);
-    navigate("/onboarding");
+    navigate(role === "hoster" ? "/hoster" : "/developer");
   };
 
   return (

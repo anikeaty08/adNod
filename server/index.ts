@@ -3,21 +3,16 @@ import express from "express";
 import { createCampaign, getCampaigns, getDatabaseReady, sanitizeCampaignMetadata } from "./campaign-store.js";
 import { parseMultipartUpload, uploadBufferToPinata } from "./pinata.js";
 import { getAssistantReply, type AssistantMessage } from "./assistant.js";
+import { buildEmbedFrameHtml, buildEmbedScript, getPublicCampaignById } from "./public-campaigns.js";
+import { assignSlotCampaign, createSlot, getSlots, sanitizeSlotMetadata } from "./slot-store.js";
 
 const app = express();
-const allowedOrigins = new Set([
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "http://localhost:4173",
-  "http://127.0.0.1:5173",
-  "http://127.0.0.1:5174",
-  "http://127.0.0.1:4173",
-]);
+const localhostOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  if (origin && allowedOrigins.has(origin)) {
+  if (origin && localhostOriginPattern.test(origin)) {
     res.header("Access-Control-Allow-Origin", origin);
     res.header("Vary", "Origin");
     res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -44,9 +39,74 @@ app.get("/api/campaigns", async (_req, res) => {
   res.json(campaigns);
 });
 
+app.get("/api/slots", async (_req, res) => {
+  const slots = await getSlots();
+  res.json(slots);
+});
+
+app.get("/api/public-campaign", async (req, res) => {
+  const campaignId = Number(req.query.campaignId ?? req.query.id);
+
+  if (!Number.isFinite(campaignId) || campaignId < 1) {
+    res.status(400).json({ error: "campaignId is required." });
+    return;
+  }
+
+  try {
+    const campaign = await getPublicCampaignById(campaignId);
+    res.json(campaign);
+  } catch (error) {
+    res.status(404).json({ error: error instanceof Error ? error.message : "Campaign not found." });
+  }
+});
+
+app.get("/api/embed.js", async (req, res) => {
+  const campaignId = Number(req.query.campaignId);
+
+  if (!Number.isFinite(campaignId) || campaignId < 1) {
+    res.status(400).type("application/javascript").send("console.error('AdNode campaignId is required.');");
+    return;
+  }
+
+  const origin = `${req.protocol}://${req.get("host")}`;
+  res.type("application/javascript").send(buildEmbedScript(origin, campaignId));
+});
+
+app.get("/api/embed-frame", async (req, res) => {
+  const campaignId = Number(req.query.campaignId);
+
+  if (!Number.isFinite(campaignId) || campaignId < 1) {
+    res.status(400).type("text/html").send("<p>AdNode campaignId is required.</p>");
+    return;
+  }
+
+  try {
+    const campaign = await getPublicCampaignById(campaignId);
+    res.type("text/html").send(buildEmbedFrameHtml(campaign));
+  } catch (error) {
+    res.status(404).type("text/html").send(`<p>${error instanceof Error ? error.message : "Campaign not found."}</p>`);
+  }
+});
+
 app.post("/api/campaigns", async (req, res) => {
   const campaign = await createCampaign(sanitizeCampaignMetadata(req.body as Record<string, unknown>));
   res.status(201).json(campaign);
+});
+
+app.post("/api/slots", async (req, res) => {
+  const slot = await createSlot(sanitizeSlotMetadata(req.body as Record<string, unknown>));
+  res.status(201).json(slot);
+});
+
+app.patch("/api/slots/:chainSlotId", async (req, res) => {
+  const updated = await assignSlotCampaign(req.params.chainSlotId, String((req.body as Record<string, unknown>)?.assignedCampaignId ?? ""));
+
+  if (!updated) {
+    res.status(404).json({ error: "Slot not found." });
+    return;
+  }
+
+  res.json(updated);
 });
 
 app.post("/api/assistant", async (req, res) => {

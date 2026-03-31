@@ -3,7 +3,7 @@ import { Encryptable, FheTypes } from "@cofhe/sdk";
 import { useAccount, useConnect, usePublicClient, useWalletClient, useWriteContract } from "wagmi";
 import { readContract } from "@wagmi/core";
 import { waitForTransactionReceipt } from "viem/actions";
-import { decodeEventLog, formatEther } from "viem";
+import { decodeEventLog, formatEther, parseAbiItem } from "viem";
 import {
   wagmiConfig,
   adRegistryAbiTyped,
@@ -14,7 +14,7 @@ import {
   formatBudgetToChainUnits,
   getCofheClient,
 } from "@/lib/contract-client";
-import { saveCampaignMetadata, fetchCampaignMetadata } from "@/lib/api";
+import { saveCampaignMetadata, fetchCampaignMetadata, fetchSlots, saveSlot, updateSlotAssignment } from "@/lib/api";
 
 export function useAdNode() {
   const { address, isConnected } = useAccount();
@@ -123,9 +123,9 @@ export function useAdNode() {
       },
       registerSlot: async (siteName: string, category: string) => {
         assertConfigured();
-        if (!walletClient) throw new Error("Wallet is not connected.");
+        if (!walletClient || !address || !publicClient) throw new Error("Wallet is not connected.");
 
-        return writeContractAsync({
+        const hash = await writeContractAsync({
           address: adRegistryAddress,
           abi: adRegistryAbiTyped,
           functionName: "registerSlot",
@@ -133,6 +133,58 @@ export function useAdNode() {
           chain: walletClient.chain,
           account: walletClient.account,
         });
+
+        const receipt = await waitForTransactionReceipt(publicClient, { hash });
+        const slotRegisteredLog = receipt.logs.find((log) => log.address.toLowerCase() === adRegistryAddress.toLowerCase());
+
+        if (!slotRegisteredLog) {
+          throw new Error("SlotRegistered event not found.");
+        }
+
+        const decoded = decodeEventLog({
+          abi: adRegistryAbiTyped,
+          data: slotRegisteredLog.data,
+          topics: slotRegisteredLog.topics,
+        });
+
+        const slotId = Number((decoded.args as { id: bigint } | undefined)?.id);
+
+        return { hash, slotId };
+      },
+      saveSlotMetadata: async (params: {
+        chainSlotId: string;
+        siteName: string;
+        siteUrl: string;
+        category: string;
+        dailyTrafficEstimate: string;
+      }) => {
+        if (!address) throw new Error("Wallet is not connected.");
+
+        return saveSlot({
+          chainSlotId: params.chainSlotId,
+          siteName: params.siteName,
+          siteUrl: params.siteUrl,
+          category: params.category,
+          dailyTrafficEstimate: params.dailyTrafficEstimate,
+          developer: address,
+          assignedCampaignId: "",
+        });
+      },
+      assignCampaignToSlot: async (slotId: number, campaignId: number) => {
+        assertConfigured();
+        if (!walletClient) throw new Error("Wallet is not connected.");
+
+        const hash = await writeContractAsync({
+          address: adRegistryAddress,
+          abi: adRegistryAbiTyped,
+          functionName: "assignCampaignToSlot",
+          args: [BigInt(slotId), BigInt(campaignId)],
+          chain: walletClient.chain,
+          account: walletClient.account,
+        });
+
+        await updateSlotAssignment(String(slotId), String(campaignId));
+        return hash;
       },
       recordImpression: async (campaignId: number) => {
         assertConfigured();
@@ -284,6 +336,26 @@ export function useAdNode() {
         );
 
         return campaigns;
+      },
+      getPlatformStats: async () => {
+        const metadata = await fetchCampaignMetadata();
+        const slots = await fetchSlots();
+        const nextCampaignId = (await readContract(wagmiConfig, {
+          address: adRegistryAddress,
+          abi: adRegistryAbiTyped,
+          functionName: "nextCampaignId",
+        })) as bigint;
+        const nextSlotId = (await readContract(wagmiConfig, {
+          address: adRegistryAddress,
+          abi: adRegistryAbiTyped,
+          functionName: "nextSlotId",
+        })) as bigint;
+
+        return {
+          totalCampaigns: metadata.length || Number(nextCampaignId) - 1,
+          totalSlots: Math.max(slots.length, Number(nextSlotId) - 1),
+          totalVerifiedTransactions: 1,
+        };
       },
     }),
     [address, connectAsync, connectors, isConfigured, isConnected, isPending, publicClient, walletClient, writeContractAsync],

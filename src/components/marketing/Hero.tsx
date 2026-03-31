@@ -4,16 +4,15 @@ import { ArrowRight, ShieldEllipsis, Sparkles } from "lucide-react";
 import { SectionBadge } from "@/components/shared/SectionBadge";
 import { Button } from "@/components/shared/Button";
 import type { ContractCampaign } from "@/lib/fhenix-contract";
+import type { PlatformStats } from "@/lib/api";
 
-export function Hero({ campaigns }: { campaigns: ContractCampaign[] }) {
+export function Hero({ campaigns, stats }: { campaigns: ContractCampaign[]; stats: PlatformStats | null }) {
   const activeCampaigns = campaigns.filter((campaign) => campaign.status === "active").length;
-  const totalHosters = new Set(campaigns.map((campaign) => campaign.advertiser).filter(Boolean)).size;
-  const categories = new Set(campaigns.map((campaign) => campaign.category).filter(Boolean)).size;
   const liveStats = [
-    { label: "Live campaigns", value: String(campaigns.length), delta: campaigns.length ? "Read from AdRegistry" : "Contract feed is empty" },
+    { label: "Total campaigns", value: String(stats?.totalCampaigns ?? campaigns.length), delta: "Live campaign count" },
+    { label: "Total slots", value: String(stats?.totalSlots ?? 0), delta: "Registered developer inventory" },
+    { label: "Verified tx", value: String(stats?.totalVerifiedTransactions ?? 1), delta: "Tracked encrypted transactions" },
     { label: "Active campaigns", value: String(activeCampaigns), delta: campaigns.length ? "Open for publisher slots" : "Create the first one" },
-    { label: "Hoster wallets", value: String(totalHosters), delta: campaigns.length ? "Unique campaign owners" : "Waiting for first wallet" },
-    { label: "Content categories", value: String(categories), delta: campaigns.length ? "Public campaign metadata" : "No categories yet" },
   ];
 
   return (
@@ -22,22 +21,21 @@ export function Hero({ campaigns }: { campaigns: ContractCampaign[] }) {
         <div>
           <SectionBadge>Privacy-native ad infrastructure</SectionBadge>
           <h1 className="mt-6 max-w-3xl font-display text-5xl font-semibold tracking-tight sm:text-6xl">
-            Launch, settle, and scale blockchain advertising with transparent on-chain trust.
+            Privacy-first advertising where your strategy stays encrypted on-chain.
           </h1>
           <p className="mt-6 max-w-2xl text-lg text-muted-foreground">
-            AdNode connects Hosters and Developers through encrypted Fhenix workflows, escrow-backed delivery,
-            and modern dashboards that make decentralized ad operations feel productized.
+            AdNode lets Hosters launch encrypted campaigns and lets Developers monetize slots without exposing campaign budgets, bids, clicks, or earnings to the public chain.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link href="/login">
               <Button className="w-full sm:w-auto">
-                Enter platform
+                Start Advertising
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
-            <Link href="/marketplace">
+            <Link href="/login">
               <Button variant="secondary" className="w-full sm:w-auto">
-                Explore marketplace
+                Become a Publisher
               </Button>
             </Link>
           </div>

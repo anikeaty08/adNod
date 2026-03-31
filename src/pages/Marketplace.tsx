@@ -9,14 +9,19 @@ export function Marketplace() {
   const { isConfigured } = useAdNode();
   const [category, setCategory] = useState("all");
   const [sort, setSort] = useState("newest");
-  const categories = useMemo(() => Array.from(new Set(campaigns.map((campaign) => campaign.category))).sort(), [campaigns]);
+  const [search, setSearch] = useState("");
+  const categories = useMemo(() => ["Gaming", "Finance", "Tech", "Lifestyle", "Web3", "Other"], []);
   const filteredCampaigns = useMemo(() => {
-    const next = campaigns.filter((campaign) => category === "all" || campaign.category === category);
+    const next = campaigns.filter((campaign) => {
+      const matchesCategory = category === "all" || campaign.category.toLowerCase() === category.toLowerCase();
+      const matchesSearch = campaign.title.toLowerCase().includes(search.toLowerCase());
+      return matchesCategory && matchesSearch && campaign.status === "active";
+    });
     if (sort === "newest") {
       return [...next].sort((left, right) => Number(right.id) - Number(left.id));
     }
-    return next;
-  }, [campaigns, category, sort]);
+    return [...next].sort((left, right) => Number(left.id) - Number(right.id));
+  }, [campaigns, category, search, sort]);
 
   return (
     <section className="page-shell py-12 sm:py-16">
@@ -32,7 +37,16 @@ export function Marketplace() {
           {isConfigured ? "Public listings come from AdRegistry. Financial metrics stay encrypted for owners only." : "Configure Fhenix RPC and contract addresses to load marketplace campaigns."}
         </div>
       </div>
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
+      <div className="mt-8 grid gap-4 lg:grid-cols-3">
+        <label className="space-y-2 text-sm">
+          <span>Search</span>
+          <input
+            className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
+            placeholder="Search by campaign title"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
         <label className="space-y-2 text-sm">
           <span>Filter by category</span>
           <select className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50" value={category} onChange={(event) => setCategory(event.target.value)}>
@@ -48,6 +62,7 @@ export function Marketplace() {
           <span>Sort</span>
           <select className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50" value={sort} onChange={(event) => setSort(event.target.value)}>
             <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
           </select>
         </label>
       </div>

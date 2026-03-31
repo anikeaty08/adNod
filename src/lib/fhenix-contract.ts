@@ -25,6 +25,16 @@ export interface ContractCampaign {
   clicks?: number | null;
 }
 
+export interface SlotMetadata {
+  chainSlotId: string;
+  siteName: string;
+  siteUrl: string;
+  category: string;
+  dailyTrafficEstimate: string;
+  developer: string;
+  assignedCampaignId: string;
+}
+
 declare global {
   interface Window {
     ethereum?: any;

@@ -10,26 +10,29 @@ import { useWallet } from "@/context/WalletContext";
 
 export function HosterDashboard() {
   const { data: campaigns = [] } = useCampaigns();
-  const metrics = useCampaignMetrics(campaigns);
-  const { isConfigured, setCampaignActive } = useAdNode();
+  const { isConfigured, setCampaignActive, getMyBudget, getMyStats } = useAdNode();
   const { connected, address } = useWallet();
   const [updatingCampaignId, setUpdatingCampaignId] = useState<number | null>(null);
+  const [decryptingBudgetCampaignId, setDecryptingBudgetCampaignId] = useState<number | null>(null);
+  const [decryptingStatsCampaignId, setDecryptingStatsCampaignId] = useState<number | null>(null);
+  const [decryptedCampaigns, setDecryptedCampaigns] = useState<Record<string, { budget: string | null; impressions: number | null; clicks: number | null; status: string | null }>>({});
   const ownedCampaigns = address ? campaigns.filter((campaign) => campaign.advertiser.toLowerCase() === address.toLowerCase()) : [];
+  const metrics = useCampaignMetrics(ownedCampaigns);
   const hosterMetrics = [
     {
       label: "Campaigns created",
-      value: String(campaigns.length),
-      hint: campaigns.length ? "Read from AdRegistry with metadata from the API" : "No campaigns created yet",
+      value: String(ownedCampaigns.length),
+      hint: ownedCampaigns.length ? "Your campaigns from AdRegistry and metadata storage" : "No campaigns created yet",
     },
     {
       label: "Active campaigns",
       value: String(metrics.activeCount),
-      hint: campaigns.length ? "Currently available to publishers" : "Create and activate your first campaign",
+      hint: ownedCampaigns.length ? "Currently available to publishers" : "Create and activate your first campaign",
     },
     {
       label: "Encrypted budgets",
-      value: campaigns.length ? "On-chain" : "Locked",
-      hint: connected ? "Decrypt a campaign budget from the panel below." : "Connect your wallet to decrypt campaign budgets.",
+      value: ownedCampaigns.length ? "On-chain" : "Locked",
+      hint: connected ? "Decrypt a campaign budget directly from its card." : "Connect your wallet to decrypt campaign budgets.",
     },
     {
       label: "Analytics access",
@@ -44,6 +47,84 @@ export function HosterDashboard() {
       await setCampaignActive(campaignId, nextActive);
     } finally {
       setUpdatingCampaignId(null);
+    }
+  };
+
+  const handleDecryptBudget = async (campaignId: number) => {
+    setDecryptingBudgetCampaignId(campaignId);
+    setDecryptedCampaigns((current) => ({
+      ...current,
+      [String(campaignId)]: {
+        budget: current[String(campaignId)]?.budget ?? null,
+        impressions: current[String(campaignId)]?.impressions ?? null,
+        clicks: current[String(campaignId)]?.clicks ?? null,
+        status: "Requesting wallet permit for campaign budget...",
+      },
+    }));
+
+    try {
+      const budget = await getMyBudget(campaignId);
+      setDecryptedCampaigns((current) => ({
+        ...current,
+        [String(campaignId)]: {
+          budget,
+          impressions: current[String(campaignId)]?.impressions ?? null,
+          clicks: current[String(campaignId)]?.clicks ?? null,
+          status: "Campaign budget decrypted with your wallet permit.",
+        },
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Decrypt failed - check you are the campaign owner";
+      setDecryptedCampaigns((current) => ({
+        ...current,
+        [String(campaignId)]: {
+          budget: current[String(campaignId)]?.budget ?? null,
+          impressions: current[String(campaignId)]?.impressions ?? null,
+          clicks: current[String(campaignId)]?.clicks ?? null,
+          status: message,
+        },
+      }));
+    } finally {
+      setDecryptingBudgetCampaignId(null);
+    }
+  };
+
+  const handleDecryptStats = async (campaignId: number) => {
+    setDecryptingStatsCampaignId(campaignId);
+    setDecryptedCampaigns((current) => ({
+      ...current,
+      [String(campaignId)]: {
+        budget: current[String(campaignId)]?.budget ?? null,
+        impressions: current[String(campaignId)]?.impressions ?? null,
+        clicks: current[String(campaignId)]?.clicks ?? null,
+        status: "Requesting wallet permit for campaign stats...",
+      },
+    }));
+
+    try {
+      const stats = await getMyStats(campaignId);
+      setDecryptedCampaigns((current) => ({
+        ...current,
+        [String(campaignId)]: {
+          budget: current[String(campaignId)]?.budget ?? null,
+          impressions: stats.impressions,
+          clicks: stats.clicks,
+          status: "Campaign stats decrypted with your wallet permit.",
+        },
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Decrypt failed - check you are the campaign owner";
+      setDecryptedCampaigns((current) => ({
+        ...current,
+        [String(campaignId)]: {
+          budget: current[String(campaignId)]?.budget ?? null,
+          impressions: current[String(campaignId)]?.impressions ?? null,
+          clicks: current[String(campaignId)]?.clicks ?? null,
+          status: message,
+        },
+      }));
+    } finally {
+      setDecryptingStatsCampaignId(null);
     }
   };
 
@@ -65,7 +146,7 @@ export function HosterDashboard() {
       </div>
       <div className="mt-8 grid gap-8 xl:grid-cols-[1.05fr_0.95fr]">
         <CampaignForm />
-        <PerformancePanel campaigns={ownedCampaigns} />
+        <PerformancePanel campaigns={ownedCampaigns} statsByCampaign={decryptedCampaigns} />
       </div>
       {!isConfigured ? (
         <div className="mt-6 rounded-[28px] border border-amber-300/60 bg-amber-50/80 px-5 py-4 text-sm text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100">
@@ -73,14 +154,22 @@ export function HosterDashboard() {
         </div>
       ) : null}
       <div className="mt-8 grid gap-5">
-        {campaigns.length ? (
-          campaigns.map((campaign) => (
+        {ownedCampaigns.length ? (
+          ownedCampaigns.map((campaign) => (
             <CampaignCard
               key={campaign.id}
               campaign={campaign}
               showControls={Boolean(address) && campaign.advertiser.toLowerCase() === address?.toLowerCase()}
               onToggleActive={(campaignId, nextActive) => void handleToggleCampaign(campaignId, nextActive)}
               isUpdating={updatingCampaignId === Number(campaign.id)}
+              onDecryptBudget={(campaignId) => void handleDecryptBudget(campaignId)}
+              onDecryptStats={(campaignId) => void handleDecryptStats(campaignId)}
+              isDecryptingBudget={decryptingBudgetCampaignId === Number(campaign.id)}
+              isDecryptingStats={decryptingStatsCampaignId === Number(campaign.id)}
+              decryptedBudget={decryptedCampaigns[campaign.id]?.budget ?? null}
+              decryptedImpressions={decryptedCampaigns[campaign.id]?.impressions ?? null}
+              decryptedClicks={decryptedCampaigns[campaign.id]?.clicks ?? null}
+              decryptStatus={decryptedCampaigns[campaign.id]?.status ?? null}
             />
           ))
         ) : (

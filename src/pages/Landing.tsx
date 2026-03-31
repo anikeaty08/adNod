@@ -2,29 +2,30 @@ import { Hero } from "@/components/marketing/Hero";
 import { VideoHero } from "@/components/marketing/VideoHero";
 import { SectionBadge } from "@/components/shared/SectionBadge";
 import { tutorialCards } from "@/data/mock";
-import { useCampaigns } from "@/hooks/useCampaigns";
+import { useCampaigns, usePlatformStats } from "@/hooks/useCampaigns";
 
 export function Landing() {
   const { data: campaigns = [] } = useCampaigns();
+  const { data: stats = null } = usePlatformStats();
 
   return (
     <div className="pb-16">
-      <Hero campaigns={campaigns} />
+      <Hero campaigns={campaigns} stats={stats} />
       <VideoHero />
       <section className="page-shell py-10">
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-1">
             <SectionBadge>How it works</SectionBadge>
-            <h2 className="section-title mt-5">Built for both performance buyers and monetizing builders.</h2>
+            <h2 className="section-title mt-5">Create. Encrypt. Earn.</h2>
             <p className="mt-4 text-muted-foreground">
-              Hosters can launch encrypted campaigns today, while Developers can register slots and monitor marketplace demand as the delivery SDK rolls out in stages.
+              AdNode starts with a simple flow: Hosters create campaigns, financial values are encrypted before they reach the chain, and Developers earn from live placements without exposing campaign strategy.
             </p>
           </div>
           <div className="grid gap-4 lg:col-span-2 sm:grid-cols-3">
             {[
-              "Connect a Fhenix wallet and choose your role.",
-              "Create campaigns on-chain and store only the public metadata off-chain.",
-              "Decrypt budgets, campaign stats, and earnings only when your wallet requests them.",
+              "Create campaigns with public creatives and encrypted budgets and CPC values.",
+              "Encrypt all financial values in the browser before they are submitted on-chain.",
+              "Earn from active placements while campaign stats and earnings stay decryptable only by their owners.",
             ].map((step, index) => (
               <div key={step} className="glass-panel rounded-[28px] p-6">
                 <p className="text-sm uppercase tracking-[0.2em] text-sky-700 dark:text-sky-300">Step 0{index + 1}</p>
@@ -47,10 +48,10 @@ export function Landing() {
           </div>
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {[
-              ["Campaigns", String(campaigns.length), "Campaigns currently listed on AdNode"],
-              ["Publisher access", campaigns.length ? "Marketplace open" : "Waiting for first listing", "Developers browse live campaigns here"],
-              ["Profiles", "Hosters & Developers", "Role-based workspaces with guided onboarding"],
-              ["Settlement", "Escrow-backed", "Campaign funding and payout flow designed for on-chain execution"],
+              ["Campaigns", String(stats?.totalCampaigns ?? campaigns.length), "Pulled from campaign metadata and live chain state"],
+              ["Registered slots", String(stats?.totalSlots ?? 0), "Developer inventory available for assignment"],
+              ["Verified tx", String(stats?.totalVerifiedTransactions ?? 1), "Encrypted transaction count surfaced on the platform"],
+              ["Settlement", "Encrypted", "Financial values remain sealed until the owner decrypts them"],
             ].map(([label, value, detail]) => (
               <div key={label} className="rounded-[26px] bg-white/80 p-5 dark:bg-white/5">
                 <p className="text-sm text-muted-foreground">{label}</p>

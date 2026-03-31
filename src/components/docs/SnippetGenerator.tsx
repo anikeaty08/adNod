@@ -1,42 +1,92 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/shared/Button";
+import { useCampaigns } from "@/hooks/useCampaigns";
 
-const snippets = {
-  html: `<!-- SDK embed is not public yet -->
-<!-- Wave 3 will ship a same-origin AdNode slot loader -->
-<div data-adnode-slot="coming-soon"></div>`,
-  react: `export function AdSlotComingSoon() {
-  return (
-    <div data-adnode-slot="coming-soon">
-      AdNode SDK is scheduled for Wave 3.
-    </div>
-  );
-}`,
-  nextjs: `export default function AdNodeSlotComingSoon() {
-  return <div data-adnode-slot="coming-soon">SDK coming in Wave 3.</div>;
-}`,
-  vue: `<template>
-  <div data-adnode-slot="coming-soon">SDK coming in Wave 3.</div>
-</template>`,
-  python: `# SDK embed is not public yet.
-# Use the Developer dashboard to register slots until Wave 3 ships.`,
-  php: `<?php
-echo "AdNode SDK is coming in Wave 3.";
-?>`,
-};
-
-type SnippetKey = keyof typeof snippets;
+type SnippetKey = "html" | "react" | "nextjs" | "vue" | "python" | "php";
+type SnippetMap = Record<SnippetKey, string>;
 
 export function SnippetGenerator() {
+  const { data: campaigns = [] } = useCampaigns();
   const [selected, setSelected] = useState<SnippetKey>("html");
-  const snippet = useMemo(() => snippets[selected], [selected]);
+  const [campaignId, setCampaignId] = useState("");
+  const activeCampaignId = campaignId || campaigns[0]?.id || "1";
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://your-adnode-domain.com";
+
+  const snippets = useMemo<SnippetMap>(
+    () => ({
+      html: `<div data-adnode-campaign="${activeCampaignId}"></div>
+<script async src="${origin}/api/embed.js?campaignId=${activeCampaignId}"></script>`,
+      react: `import { useEffect, useRef } from "react";
+
+export function AdNodeSlot() {
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = "${origin}/api/embed.js?campaignId=${activeCampaignId}";
+    ref.current?.appendChild(script);
+    return () => script.remove();
+  }, []);
+
+  return <div ref={ref} data-adnode-campaign="${activeCampaignId}" />;
+}`,
+      nextjs: `"use client";
+import { useEffect, useRef } from "react";
+
+export default function AdNodeSlot() {
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = "${origin}/api/embed.js?campaignId=${activeCampaignId}";
+    ref.current?.appendChild(script);
+    return () => script.remove();
+  }, []);
+
+  return <div ref={ref} data-adnode-campaign="${activeCampaignId}" />;
+}`,
+      vue: `<template>
+  <div ref="slot" data-adnode-campaign="${activeCampaignId}"></div>
+</template>
+
+<script setup>
+import { onMounted, onBeforeUnmount, ref } from "vue";
+
+const slot = ref(null);
+let script;
+
+onMounted(() => {
+  script = document.createElement("script");
+  script.async = true;
+  script.src = "${origin}/api/embed.js?campaignId=${activeCampaignId}";
+  slot.value?.appendChild(script);
+});
+
+onBeforeUnmount(() => script?.remove());
+</script>`,
+      python: `# Server-rendered HTML example
+html = """
+<div data-adnode-campaign="${activeCampaignId}"></div>
+<script async src="${origin}/api/embed.js?campaignId=${activeCampaignId}"></script>
+"""`,
+      php: `<?php
+echo '<div data-adnode-campaign="${activeCampaignId}"></div>';
+echo '<script async src="${origin}/api/embed.js?campaignId=${activeCampaignId}"></script>';
+?>`,
+    }),
+    [activeCampaignId, origin],
+  );
+
+  const snippet = useMemo(() => snippets[selected], [selected, snippets]);
 
   return (
     <div className="glass-panel rounded-[32px] p-7">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h3 className="font-display text-2xl font-semibold">Integration snippet generator</h3>
-          <p className="mt-2 text-sm text-muted-foreground">Preview the planned SDK shape without exposing fake endpoints or dead embed URLs.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Generate a live AdNode embed snippet for an active campaign and serve its public creative on external sites.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {(Object.keys(snippets) as SnippetKey[]).map((key) => (
@@ -52,10 +102,29 @@ export function SnippetGenerator() {
           ))}
         </div>
       </div>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <label className="space-y-2 text-sm">
+          <span>Campaign</span>
+          <select className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50" value={activeCampaignId} onChange={(event) => setCampaignId(event.target.value)}>
+            {campaigns.length ? (
+              campaigns.map((campaign) => (
+                <option key={campaign.id} value={campaign.id}>
+                  {campaign.title} ({campaign.id})
+                </option>
+              ))
+            ) : (
+              <option value="1">Campaign 1</option>
+            )}
+          </select>
+        </label>
+        <div className="rounded-[24px] bg-white/70 px-5 py-4 text-sm text-muted-foreground dark:bg-white/5">
+          This snippet loads a real AdNode iframe from <span className="font-mono text-xs">{origin}</span> for campaign <span className="font-semibold">{activeCampaignId}</span>.
+        </div>
+      </div>
       <pre className="mt-6 overflow-x-auto rounded-[28px] bg-slate-950 p-6 font-mono text-sm leading-6 text-sky-100">
         <code>{snippet}</code>
       </pre>
-      <p className="mt-4 text-sm text-muted-foreground">The live browser SDK is not public in this build yet, so these examples are intentionally marked as coming soon.</p>
+      <p className="mt-4 text-sm text-muted-foreground">The embed uses AdNode&apos;s real public campaign endpoint and renders the creative inside a hosted iframe.</p>
       <Button className="mt-5" onClick={() => void navigator.clipboard.writeText(snippet)}>
         Copy snippet
       </Button>

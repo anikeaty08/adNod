@@ -5,7 +5,6 @@ import { AppShell } from "@/components/layout/AppShell";
 import { IntroVideo } from "@/components/marketing/IntroVideo";
 import { Landing } from "@/pages/Landing";
 import { Login } from "@/pages/Login";
-import { Onboarding } from "@/pages/Onboarding";
 import { HosterDashboard } from "@/pages/HosterDashboard";
 import { DeveloperDashboard } from "@/pages/DeveloperDashboard";
 import { Marketplace } from "@/pages/Marketplace";
@@ -69,7 +68,6 @@ export default function App() {
               <Switch>
                 <Route path="/" component={Landing} />
                 <Route path="/login" component={Login} />
-                <Route path="/onboarding" component={Onboarding} />
                 <Route path="/hoster">
                   <ProtectedRoute expectedRole="hoster">
                     <HosterDashboard />
