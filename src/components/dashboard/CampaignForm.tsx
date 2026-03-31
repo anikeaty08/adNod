@@ -68,7 +68,7 @@ export function CampaignForm() {
         </div>
       </div>
       <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4">
           <label className="space-y-2 text-sm">
             <span>Campaign title</span>
             <input
@@ -77,15 +77,8 @@ export function CampaignForm() {
               {...form.register("title")}
             />
           </label>
-          <label className="space-y-2 text-sm">
-            <span>Creative URI</span>
-            <input
-              className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
-              placeholder="ipfs://..."
-              {...form.register("creativeURI")}
-            />
-          </label>
         </div>
+        <input type="hidden" {...form.register("creativeURI")} />
         <label className="space-y-2 text-sm">
           <span>Category</span>
           <input
@@ -133,7 +126,7 @@ export function CampaignForm() {
         <FileUpload
           onUploaded={(uri) => {
             form.setValue("creativeURI", uri, { shouldValidate: true });
-            setStatus(`Creative uploaded to ${uri}`);
+            setStatus("Creative uploaded to IPFS and ready for campaign creation.");
           }}
         />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

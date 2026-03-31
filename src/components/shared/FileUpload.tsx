@@ -6,7 +6,7 @@ export function FileUpload({
 }: {
   onUploaded?: (uri: string) => void;
 }) {
-  const [status, setStatus] = useState("Drag video or image here.");
+  const [status, setStatus] = useState("Upload an image or video and AdNode will pin it to IPFS automatically.");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {

@@ -1,0 +1,39 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="80" x2="1080" y2="550" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E9F7FF"/>
+      <stop offset="0.45" stop-color="#8ED7FF"/>
+      <stop offset="1" stop-color="#1E90FF"/>
+    </linearGradient>
+    <linearGradient id="card" x1="770" y1="120" x2="980" y2="440" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#1E293B" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" rx="36" fill="url(#bg)"/>
+  <circle cx="1032" cy="94" r="148" fill="#FFFFFF" fill-opacity="0.16"/>
+  <circle cx="177" cy="553" r="172" fill="#FFFFFF" fill-opacity="0.14"/>
+  <rect x="74" y="74" width="1052" height="482" rx="34" fill="#FFFFFF" fill-opacity="0.26" stroke="#FFFFFF" stroke-opacity="0.48"/>
+  <rect x="116" y="118" width="520" height="42" rx="21" fill="#0C4A6E" fill-opacity="0.10"/>
+  <text x="142" y="146" fill="#0F172A" font-family="Space Grotesk, Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">ADNODE • CONFIDENTIAL CAMPAIGNS</text>
+  <text x="116" y="238" fill="#0F172A" font-family="Space Grotesk, Arial, sans-serif" font-size="72" font-weight="700">
+    <tspan x="116" dy="0">Launch privately.</tspan>
+    <tspan x="116" dy="78">Scale transparently.</tspan>
+  </text>
+  <text x="118" y="388" fill="#0F172A" fill-opacity="0.84" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="500">
+    <tspan x="118" dy="0">Encrypted budgets, sealed CPC bids, and wallet-native</tspan>
+    <tspan x="118" dy="40">publisher payouts built on Fhenix Arbitrum Sepolia.</tspan>
+  </text>
+  <rect x="116" y="450" width="256" height="64" rx="22" fill="#0EA5E9"/>
+  <text x="150" y="491" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">Create Campaign</text>
+  <rect x="771" y="128" width="283" height="332" rx="28" fill="url(#card)" stroke="#7DD3FC" stroke-opacity="0.35"/>
+  <text x="808" y="177" fill="#E0F2FE" font-family="JetBrains Mono, monospace" font-size="16">creativeURI</text>
+  <text x="808" y="211" fill="#FFFFFF" font-family="JetBrains Mono, monospace" font-size="21">ipfs://adnode-launch</text>
+  <text x="808" y="271" fill="#7DD3FC" font-family="JetBrains Mono, monospace" font-size="16">budget</text>
+  <text x="808" y="304" fill="#FFFFFF" font-family="JetBrains Mono, monospace" font-size="32">encrypted</text>
+  <text x="808" y="360" fill="#7DD3FC" font-family="JetBrains Mono, monospace" font-size="16">cpc</text>
+  <text x="808" y="393" fill="#FFFFFF" font-family="JetBrains Mono, monospace" font-size="32">encrypted</text>
+  <text x="808" y="443" fill="#BAE6FD" font-family="Inter, Arial, sans-serif" font-size="18">Only you decrypt your strategy.</text>
+  <rect x="771" y="487" width="283" height="42" rx="21" fill="#38BDF8" fill-opacity="0.20"/>
+  <text x="835" y="514" fill="#E0F2FE" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="600">Powered by CoFHE</text>
+</svg>

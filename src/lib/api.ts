@@ -1,6 +1,9 @@
 import type { ContractCampaign } from "@/lib/fhenix-contract";
 
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "" : "http://127.0.0.1:4000");
+const isLocalPreview =
+  typeof window !== "undefined" && (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost");
+
+const API_URL = import.meta.env.VITE_API_URL || (isLocalPreview ? "http://127.0.0.1:4000" : "");
 
 export interface CampaignMetadata {
   chainCampaignId: string;
