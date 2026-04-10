@@ -1,6 +1,8 @@
 {
   "network": "fhenixArbitrumSepolia",
-  "adRegistry": "0xd559D7bcE4A56fCdEE0C80a315eB568c4C841588",
-  "adAnalytics": "0xAB6ea9d6d55353b25937d4A4dec55fe5aC9F6950",
-  "deployedAt": "2026-03-30T21:41:21.100Z"
+  "payoutWrapper": "0xb245E1d7377Ffc1306Ca0e56c82DBDB7081b0796",
+  "wrappedNativeToken": "0xc556bae1e86b2ae9c22ea5e036b07e55e7596074",
+  "adRegistry": "0x10889A3cdebf76c3fe8B00B839D096bA80Ae05Cc",
+  "adAnalytics": "0x279b12c0A78E80560Ce3F2B119C2fDAC0bfc57B6",
+  "deployedAt": "2026-04-10T12:32:38.833Z"
 }

@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo } from "react";
 import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
-import { getNetworkLabel } from "@/lib/contract-client";
+import { getNetworkLabel, isWalletConnectEnabled } from "@/lib/contract-client";
 
 interface WalletState {
   address: string | null;
@@ -9,13 +9,26 @@ interface WalletState {
   connected: boolean;
   isConnecting: boolean;
   isWrongNetwork: boolean;
+  isWalletConnectReady: boolean;
   error: string | null;
-  connect: () => Promise<void>;
+  connectWalletConnect: () => Promise<void>;
   disconnect: () => void;
   switchToArbitrumSepolia: () => Promise<void>;
 }
 
 const WalletContext = createContext<WalletState | undefined>(undefined);
+
+function toReadableWalletError(message?: string | null) {
+  const normalized = (message || "").toLowerCase();
+
+  if (!message) return null;
+  if (normalized.includes("user rejected")) return "Wallet connection was cancelled.";
+  if (normalized.includes("project id")) return "WalletConnect is not configured yet. Add VITE_WALLETCONNECT_PROJECT_ID.";
+  if (normalized.includes("connector not found")) return "Requested wallet connector is not available.";
+  if (normalized.includes("chain")) return "Wallet connected, but the selected network is not the Fhenix-compatible testnet.";
+
+  return message;
+}
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const { address, isConnected } = useAccount();
@@ -24,25 +37,37 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const { disconnect } = useDisconnect();
   const { switchChainAsync } = useSwitchChain();
 
+  const walletConnectConnector = connectors.find(
+    (connector) => connector.id === "walletConnect" || connector.name.toLowerCase().includes("walletconnect"),
+  );
+
   const value = useMemo(
     () => ({
       address: address ?? null,
-      network: getNetworkLabel(chainId),
+      network: getNetworkLabel(chainId) ? `${getNetworkLabel(chainId)} (Fhenix-compatible)` : null,
       chainId: chainId ?? null,
       connected: isConnected,
       isConnecting: isPending,
       isWrongNetwork: Boolean(isConnected && chainId !== 421614),
-      error: error?.message ?? null,
-      connect: async () => {
-        if (!connectors.length) throw new Error("No wallet connector available.");
-        await connectAsync({ connector: connectors[0] });
+      isWalletConnectReady: isWalletConnectEnabled() && Boolean(walletConnectConnector),
+      error: toReadableWalletError(error?.message ?? null),
+      connectWalletConnect: async () => {
+        if (!isWalletConnectEnabled()) {
+          throw new Error("WalletConnect is not configured. Add VITE_WALLETCONNECT_PROJECT_ID to your environment.");
+        }
+
+        if (!walletConnectConnector) {
+          throw new Error("WalletConnect connector is not available.");
+        }
+
+        await connectAsync({ connector: walletConnectConnector });
       },
       disconnect,
       switchToArbitrumSepolia: async () => {
         await switchChainAsync({ chainId: 421614 });
       },
     }),
-    [address, chainId, connectors, connectAsync, disconnect, error?.message, isConnected, isPending, switchChainAsync],
+    [address, chainId, connectAsync, disconnect, error?.message, isConnected, isPending, switchChainAsync, walletConnectConnector],
   );
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

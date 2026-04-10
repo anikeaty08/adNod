@@ -1,21 +1,21 @@
-import { createConfig, http } from "wagmi";
-import { injected } from "wagmi/connectors";
-import { defineChain, type Address, createPublicClient, createWalletClient, custom, parseEther } from "viem";
+import { createConfig, createStorage, http } from "wagmi";
+import { walletConnect } from "wagmi/connectors";
+import { defineChain, type Address, createPublicClient, createWalletClient, custom, parseEther, formatUnits, parseUnits, type WalletClient } from "viem";
 import { createCofheClient, createCofheConfig } from "@cofhe/sdk/web";
 import { arbSepolia } from "@cofhe/sdk/chains";
 import type { FheTypes } from "@cofhe/sdk";
 import adRegistryAbi from "@/lib/abi/AdRegistry.json";
 import adAnalyticsAbi from "@/lib/abi/AdAnalytics.json";
+import adNodePayoutWrapperAbi from "@/lib/abi/AdNodePayoutWrapper.json";
 
 const chainId = Number(import.meta.env.VITE_CHAIN_ID || 421614);
 const rpcUrl = import.meta.env.VITE_FHENIX_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc";
-const defaultAdRegistryAddress = "0xd559D7bcE4A56fCdEE0C80a315eB568c4C841588";
-const defaultAdAnalyticsAddress = "0xAB6ea9d6d55353b25937d4A4dec55fe5aC9F6950";
+const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || "";
 
 export const fhenixArbitrumSepolia = defineChain({
   id: chainId,
-  name: "Arbitrum Sepolia",
-  network: "arbitrum-sepolia",
+  name: "Fhenix Testnet",
+  network: "fhenix-testnet",
   nativeCurrency: {
     name: "ETH",
     symbol: "ETH",
@@ -37,19 +37,43 @@ export const fhenixArbitrumSepolia = defineChain({
   },
 });
 
+const connectors = [
+  ...(walletConnectProjectId
+    ? [
+        walletConnect({
+          projectId: walletConnectProjectId,
+          showQrModal: true,
+          metadata: {
+            name: "AdNode",
+            description: "Confidential ad marketplace on the Fhenix-compatible Arbitrum Sepolia testnet.",
+            url: "https://adnode.app",
+            icons: ["https://walletconnect.com/walletconnect-logo.png"],
+          },
+          qrModalOptions: {
+            themeMode: "light",
+          },
+        }),
+      ]
+    : []),
+] as const;
+
 export const wagmiConfig = createConfig({
   chains: [fhenixArbitrumSepolia],
-  connectors: [injected()],
+  connectors,
   transports: {
     [fhenixArbitrumSepolia.id]: http(rpcUrl),
   },
+  storage: createStorage({
+    storage: window.localStorage,
+  }),
 });
 
-export const adRegistryAddress = (import.meta.env.VITE_ADREGISTRY_ADDRESS || defaultAdRegistryAddress) as Address;
-export const adAnalyticsAddress = (import.meta.env.VITE_ADANALYTICS_ADDRESS || defaultAdAnalyticsAddress) as Address;
+export const adRegistryAddress = import.meta.env.VITE_ADREGISTRY_ADDRESS ? (import.meta.env.VITE_ADREGISTRY_ADDRESS as Address) : undefined;
+export const adAnalyticsAddress = import.meta.env.VITE_ADANALYTICS_ADDRESS ? (import.meta.env.VITE_ADANALYTICS_ADDRESS as Address) : undefined;
 
 export const adRegistryAbiTyped = adRegistryAbi;
 export const adAnalyticsAbiTyped = adAnalyticsAbi;
+export const adNodePayoutWrapperAbiTyped = adNodePayoutWrapperAbi;
 
 const cofheConfig = createCofheConfig({
   supportedChains: [
@@ -64,19 +88,23 @@ const cofheConfig = createCofheConfig({
 
 const cofheClient = createCofheClient(cofheConfig);
 
-export async function getCofheClient() {
-  if (!window.ethereum) {
-    throw new Error("No injected wallet provider found.");
-  }
-
+export async function getCofheClient(activeWalletClient?: WalletClient) {
   const publicClient = createPublicClient({
     chain: fhenixArbitrumSepolia,
     transport: http(rpcUrl),
   });
-  const walletClient = createWalletClient({
-    chain: fhenixArbitrumSepolia,
-    transport: custom(window.ethereum),
-  });
+  const walletClient =
+    activeWalletClient ??
+    (() => {
+      if (!window.ethereum) {
+        throw new Error("No active WalletConnect session found. Connect with WalletConnect first.");
+      }
+
+      return createWalletClient({
+        chain: fhenixArbitrumSepolia,
+        transport: custom(window.ethereum),
+      });
+    })();
 
   await cofheClient.connect(publicClient, walletClient);
   return cofheClient;
@@ -100,6 +128,31 @@ export function formatBudgetToChainUnits(value: string) {
   return parseEther(value);
 }
 
+export function parseRateToMicrounits(value: string) {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new Error("Campaign rate is required.");
+  }
+
+  const [whole = "0", fractional = ""] = normalized.split(".");
+  const fractionalPadded = `${fractional}000000`.slice(0, 6);
+  const microunits = BigInt(whole) * 1_000_000n + BigInt(fractionalPadded);
+
+  if (microunits <= 0n || microunits > 4_294_967_295n) {
+    throw new Error("Campaign rate must fit within the supported encrypted pricing range.");
+  }
+
+  return Number(microunits);
+}
+
+export function formatPayoutTokenUnits(value: bigint) {
+  return formatUnits(value, 6);
+}
+
+export function parsePayoutTokenUnits(value: string) {
+  return parseUnits(value, 6);
+}
+
 export function getNetworkLabel(chainIdValue?: number | null) {
   if (chainIdValue === 421614) {
     return "Arbitrum Sepolia";
@@ -118,4 +171,8 @@ export function getIpfsGatewayUrl(uri: string) {
   }
 
   return uri;
+}
+
+export function isWalletConnectEnabled() {
+  return Boolean(walletConnectProjectId);
 }

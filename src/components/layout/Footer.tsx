@@ -7,7 +7,7 @@ export function Footer() {
         <div>
           <p className="font-display text-xl font-semibold">AdNode</p>
           <p className="mt-3 max-w-md text-sm text-muted-foreground">
-            Commercial-grade decentralized advertising for wallet-native apps, dApps, and publisher ecosystems.
+            Privacy-native advertising infrastructure for wallet-native apps, dApps, and publisher ecosystems.
           </p>
         </div>
         <div>

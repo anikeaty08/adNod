@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import "dotenv/config";
 import { createSlot, getSlots, sanitizeSlotMetadata } from "../server/slot-store.js";
 import { assertSignedRequest } from "../server/request-auth.js";
+import { getSlotDeveloper } from "../server/chain-state.js";
 
 async function readBody(req: IncomingMessage) {
   const chunks: Buffer[] = [];
@@ -26,13 +27,33 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   if (req.method === "POST") {
     const body = (await readBody(req)) as Record<string, unknown>;
-    const sanitized = sanitizeSlotMetadata(body);
+    const candidate = sanitizeSlotMetadata({
+      ...body,
+      developer: String(body.developer ?? ""),
+    });
+    let signerAddress = "";
 
     try {
-      await assertSignedRequest(req.headers, "slots:create", sanitized);
+      signerAddress = await assertSignedRequest(req.headers, "slots:create", candidate);
     } catch (error) {
       res.statusCode = 401;
       res.end(JSON.stringify({ error: error instanceof Error ? error.message : "Unauthorized request." }));
+      return;
+    }
+
+    const sanitized = sanitizeSlotMetadata({
+      ...candidate,
+      developer: signerAddress,
+    });
+
+    try {
+      const onchainDeveloper = await getSlotDeveloper(sanitized.chainSlotId);
+      if (onchainDeveloper.toLowerCase() !== signerAddress) {
+        throw new Error("Signed wallet does not own this on-chain slot.");
+      }
+    } catch (error) {
+      res.statusCode = 409;
+      res.end(JSON.stringify({ error: error instanceof Error ? error.message : "Slot ownership check failed." }));
       return;
     }
 

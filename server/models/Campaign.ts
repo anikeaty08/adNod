@@ -11,6 +11,8 @@ const CampaignSchema = new Schema(
     description: { type: String, required: true },
     creativeURI: { type: String, required: true },
     category: { type: String, required: true },
+    pricingModel: { type: String, enum: ["CPC", "CPM"], required: true },
+    rate: { type: String, required: true },
     advertiser: { type: String, required: true },
   },
   {

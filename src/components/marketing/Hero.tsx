@@ -11,7 +11,7 @@ export function Hero({ campaigns, stats }: { campaigns: ContractCampaign[]; stat
   const liveStats = [
     { label: "Total campaigns", value: String(stats?.totalCampaigns ?? campaigns.length), delta: "Live campaign count" },
     { label: "Total slots", value: String(stats?.totalSlots ?? 0), delta: "Registered developer inventory" },
-    { label: "Verified tx", value: String(stats?.totalVerifiedTransactions ?? 1), delta: "Tracked encrypted transactions" },
+    { label: "On-chain objects", value: String(stats?.totalVerifiedTransactions ?? 0), delta: "Campaign and slot entities discovered from contracts" },
     { label: "Active campaigns", value: String(activeCampaigns), delta: campaigns.length ? "Open for publisher slots" : "Create the first one" },
   ];
 
@@ -24,7 +24,7 @@ export function Hero({ campaigns, stats }: { campaigns: ContractCampaign[]; stat
             Privacy-first advertising where your strategy stays encrypted on-chain.
           </h1>
           <p className="mt-6 max-w-2xl text-lg text-muted-foreground">
-            AdNode lets Hosters launch encrypted campaigns and lets Developers monetize slots without exposing campaign budgets, bids, clicks, or earnings to the public chain.
+            AdNode lets Hosters launch encrypted campaigns and lets Developers monetize slot inventory while campaign strategy and lifetime earnings stay private by default.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link href="/login">
@@ -41,9 +41,9 @@ export function Hero({ campaigns, stats }: { campaigns: ContractCampaign[]; stat
           </div>
           <div className="mt-10 grid gap-4 sm:grid-cols-3">
             {[
-              { icon: ShieldEllipsis, label: "Escrow-backed campaign funding" },
-              { icon: Sparkles, label: "SaaS-grade analytics and UX" },
-              { icon: ArrowRight, label: "Multi-framework publisher snippets" },
+              { icon: ShieldEllipsis, label: "Funded campaign escrow" },
+              { icon: Sparkles, label: "Encrypted campaign analytics" },
+              { icon: ArrowRight, label: "Slot-safe publisher snippets" },
             ].map((item) => (
               <div key={item.label} className="rounded-[24px] border border-white/30 bg-white/60 p-4 backdrop-blur dark:border-white/5 dark:bg-white/5">
                 <item.icon className="h-5 w-5 text-sky-500" />
@@ -73,7 +73,7 @@ export function Hero({ campaigns, stats }: { campaigns: ContractCampaign[]; stat
             <p className="mt-3 font-display text-3xl font-semibold">Confidential by default</p>
             <p className="mt-2 text-sm text-white/80">
               {campaigns.length
-                ? "Budgets, bids, and analytics stay encrypted on-chain while creatives remain publicly discoverable."
+                ? "Budgets, campaign rates, and analytics stay encrypted on-chain while creatives remain publicly discoverable."
                 : "Campaign counts will appear here after the first on-chain listing is created."}
             </p>
           </div>

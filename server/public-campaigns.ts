@@ -1,36 +1,8 @@
-import { createPublicClient, http } from "viem";
-import { defineChain } from "viem";
 import adRegistryAbi from "../src/lib/abi/AdRegistry.json" with { type: "json" };
 import { getCampaigns } from "./campaign-store.js";
 import { getSlots } from "./slot-store.js";
-
-const rpcUrl = process.env.VITE_FHENIX_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc";
-const chainId = Number(process.env.VITE_CHAIN_ID || 421614);
-const adRegistryAddress = (process.env.VITE_ADREGISTRY_ADDRESS || "0xd559D7bcE4A56fCdEE0C80a315eB568c4C841588") as `0x${string}`;
-
-const chain = defineChain({
-  id: chainId,
-  name: "Arbitrum Sepolia",
-  network: "arbitrum-sepolia",
-  nativeCurrency: {
-    name: "ETH",
-    symbol: "ETH",
-    decimals: 18,
-  },
-  rpcUrls: {
-    default: {
-      http: [rpcUrl],
-    },
-    public: {
-      http: [rpcUrl],
-    },
-  },
-});
-
-const publicClient = createPublicClient({
-  chain,
-  transport: http(rpcUrl),
-});
+import { adRegistryAddress, serverPublicClient as publicClient } from "./chain-state.js";
+import { createMeasurementToken } from "./measurement.js";
 
 function getIpfsGatewayUrl(uri: string) {
   if (uri.startsWith("ipfs://")) {
@@ -69,7 +41,15 @@ async function resolveAssetKind(assetUrl: string) {
   return "unknown" as const;
 }
 
+function assertRegistryConfigured() {
+  if (!adRegistryAddress) {
+    throw new Error("AdRegistry is not configured on the server.");
+  }
+}
+
 export async function getPublicCampaignById(campaignId: number) {
+  assertRegistryConfigured();
+
   const [creativeURI, category, active] = (await publicClient.readContract({
     address: adRegistryAddress,
     abi: adRegistryAbi,
@@ -88,7 +68,8 @@ export async function getPublicCampaignById(campaignId: number) {
     | {
         title?: string;
         description?: string;
-        advertiser?: string;
+        pricingModel?: "CPC" | "CPM";
+        rate?: string;
       }
     | undefined;
 
@@ -104,11 +85,15 @@ export async function getPublicCampaignById(campaignId: number) {
     assetUrl,
     assetKind,
     category,
+    pricingModel: metadataItem?.pricingModel || "CPC",
+    rate: metadataItem?.rate || "0",
     active,
   };
 }
 
 export async function getPublicSlotById(slotId: number) {
+  assertRegistryConfigured();
+
   const [developer, siteName, category, active, assignedCampaignId] = (await publicClient.readContract({
     address: adRegistryAddress,
     abi: adRegistryAbi,
@@ -154,30 +139,32 @@ export async function getPublicCampaignBySlotId(slotId: number) {
   };
 }
 
-export function buildEmbedScript(origin: string, options: { campaignId?: number; slotId?: number }) {
+export function buildEmbedScript(origin: string, options: { slotId: number }) {
   const safeOrigin = JSON.stringify(origin);
-  const slotId = options.slotId ? String(options.slotId) : null;
-  const campaignId = options.campaignId ? String(options.campaignId) : null;
-  const identifier = slotId ?? campaignId ?? "";
-  const selectorAttribute = slotId ? "data-adnode-slot" : "data-adnode-campaign";
-  const frameQuery = slotId
-    ? `slotId=' + encodeURIComponent(identifier)`
-    : `campaignId=' + encodeURIComponent(identifier)`;
+  const identifier = String(options.slotId);
 
-  return `(function(){\n  var identifier = ${JSON.stringify(identifier)};\n  var origin = ${safeOrigin};\n  var selector = '[${selectorAttribute}=\"' + identifier + '\"]';\n  var mount = document.querySelector(selector);\n  if (!mount) {\n    mount = document.createElement('div');\n    mount.setAttribute('${selectorAttribute}', identifier);\n    document.currentScript && document.currentScript.parentNode && document.currentScript.parentNode.insertBefore(mount, document.currentScript);\n  }\n  mount.innerHTML = '';\n  var frame = document.createElement('iframe');\n  frame.src = origin + '/api/embed?mode=frame&${frameQuery}';\n  frame.loading = 'lazy';\n  frame.style.width = '100%';\n  frame.style.minHeight = '280px';\n  frame.style.border = '0';\n  frame.style.borderRadius = '20px';\n  frame.style.overflow = 'hidden';\n  frame.setAttribute('title', 'AdNode Slot ' + identifier);\n  mount.appendChild(frame);\n})();`;
+  return `(function(){\n  var identifier = ${JSON.stringify(identifier)};\n  var origin = ${safeOrigin};\n  var selector = '[data-adnode-slot=\"' + identifier + '\"]';\n  var mount = document.querySelector(selector);\n  if (!mount) {\n    mount = document.createElement('div');\n    mount.setAttribute('data-adnode-slot', identifier);\n    document.currentScript && document.currentScript.parentNode && document.currentScript.parentNode.insertBefore(mount, document.currentScript);\n  }\n  mount.innerHTML = '';\n  var frame = document.createElement('iframe');\n  frame.src = origin + '/api/embed?mode=frame&slotId=' + encodeURIComponent(identifier);\n  frame.loading = 'lazy';\n  frame.style.width = '100%';\n  frame.style.minHeight = '280px';\n  frame.style.border = '0';\n  frame.style.borderRadius = '20px';\n  frame.style.overflow = 'hidden';\n  frame.setAttribute('title', 'AdNode Slot ' + identifier);\n  mount.appendChild(frame);\n})();`;
 }
 
-export function buildEmbedFrameHtml(campaign: Awaited<ReturnType<typeof getPublicCampaignById>>) {
+export function buildEmbedFrameHtml(
+  campaign: Awaited<ReturnType<typeof getPublicCampaignBySlotId>>,
+  options: {
+    origin: string;
+    measurementToken: string;
+  },
+) {
   const title = escapeHtml(campaign.title);
   const description = escapeHtml(campaign.description);
   const category = escapeHtml(campaign.category);
   const assetUrl = escapeHtml(campaign.assetUrl);
   const creativeLink = escapeHtml(campaign.creativeURI);
+  const safeOrigin = escapeHtml(options.origin);
+  const safeMeasurementToken = escapeHtml(options.measurementToken);
 
   const media =
     campaign.assetKind === "video"
-      ? `<video controls playsinline preload="metadata" style="width:100%;border-radius:18px;background:#020617" src="${assetUrl}"></video>`
-      : `<img alt="${title}" src="${assetUrl}" style="width:100%;display:block;border-radius:18px;object-fit:cover;background:#e0f2fe" />`;
+      ? `<video id="adnode-media" controls playsinline preload="metadata" style="width:100%;border-radius:18px;background:#020617" src="${assetUrl}"></video>`
+      : `<img id="adnode-media" alt="${title}" src="${assetUrl}" style="width:100%;display:block;border-radius:18px;object-fit:cover;background:#e0f2fe" />`;
 
   return `<!doctype html>
 <html lang="en">
@@ -254,12 +241,75 @@ export function buildEmbedFrameHtml(campaign: Awaited<ReturnType<typeof getPubli
           <span>AdNode public creative</span>
           <span>${campaign.active ? "Active" : "Paused"}</span>
         </div>
-        <a class="cta" href="${assetUrl}" target="_blank" rel="noreferrer">Open creative</a>
+        <a class="cta" id="adnode-cta" href="${assetUrl}" target="_blank" rel="noreferrer">Open creative</a>
         <div class="meta"><span>${creativeLink}</span></div>
       </div>
     </div>
+    <script>
+      (function () {
+        var endpoint = "${safeOrigin}/api/measure";
+        var token = "${safeMeasurementToken}";
+        var sentImpression = false;
+
+        function send(type) {
+          var payload = JSON.stringify({
+            token: token,
+            eventType: type,
+            pageUrl: window.location.href,
+            referrer: document.referrer || ""
+          });
+
+          if (navigator.sendBeacon) {
+            var blob = new Blob([payload], { type: "application/json" });
+            navigator.sendBeacon(endpoint, blob);
+            return;
+          }
+
+          fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: payload,
+            keepalive: true
+          }).catch(function () {});
+        }
+
+        window.addEventListener("load", function () {
+          if (sentImpression) return;
+          sentImpression = true;
+          send("impression");
+        }, { once: true });
+
+        var cta = document.getElementById("adnode-cta");
+        if (cta) {
+          cta.addEventListener("click", function () {
+            send("click");
+          });
+        }
+
+        var media = document.getElementById("adnode-media");
+        if (media) {
+          media.addEventListener("click", function () {
+            send("click");
+          });
+        }
+      })();
+    </script>
   </body>
 </html>`;
+}
+
+export function createEmbedFramePayload(
+  campaign: Awaited<ReturnType<typeof getPublicCampaignBySlotId>>,
+  origin: string,
+) {
+  return {
+    campaign,
+    measurementToken: createMeasurementToken({
+      chainCampaignId: campaign.id,
+      chainSlotId: campaign.slotId,
+    }),
+    origin,
+  };
 }
 
 function escapeHtml(value: string) {

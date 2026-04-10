@@ -1,14 +1,23 @@
 import { connectDatabase } from "./db.js";
 import { CampaignModel } from "./models/Campaign.js";
+import { campaignMetadataSchema } from "./validators.js";
 
 const memoryCampaigns: Record<string, unknown>[] = [];
-const metadataFields = ["chainCampaignId", "title", "description", "creativeURI", "category", "advertiser"] as const;
+export const metadataFields = ["chainCampaignId", "title", "description", "creativeURI", "category", "pricingModel", "rate", "advertiser"] as const;
 
 export function sanitizeCampaignMetadata(payload: Record<string, unknown>) {
-  return metadataFields.reduce<Record<string, unknown>>((accumulator, field) => {
-    accumulator[field] = String(payload[field] ?? "");
-    return accumulator;
-  }, {});
+  const parsed = campaignMetadataSchema.parse({
+    chainCampaignId: String(payload.chainCampaignId ?? ""),
+    title: String(payload.title ?? ""),
+    description: String(payload.description ?? ""),
+    creativeURI: String(payload.creativeURI ?? ""),
+    category: String(payload.category ?? ""),
+    pricingModel: String(payload.pricingModel ?? "CPC"),
+    rate: String(payload.rate ?? ""),
+    advertiser: String(payload.advertiser ?? "").toLowerCase(),
+  });
+
+  return parsed;
 }
 
 export async function getCampaigns() {
@@ -25,7 +34,13 @@ export async function createCampaign(payload: Record<string, unknown>) {
 
   try {
     await connectDatabase();
-    return await CampaignModel.create(sanitized);
+    return await CampaignModel.findOneAndUpdate({ chainCampaignId: sanitized.chainCampaignId }, sanitized, {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true,
+    })
+      .select(metadataFields.join(" "))
+      .lean();
   } catch {
     const localCampaign = {
       ...sanitized,

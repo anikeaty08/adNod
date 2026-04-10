@@ -24,6 +24,7 @@ export const defaultCampaignForm: CampaignInput = {
   creativeURI: "",
   category: "",
   budget: "",
+  initialFunding: "",
   pricingModel: "CPC",
-  rate: 0,
+  rate: "",
 };

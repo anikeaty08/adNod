@@ -3,9 +3,13 @@ import express, { type Request, type Response } from "express";
 import { createCampaign, getCampaigns, getDatabaseReady, sanitizeCampaignMetadata } from "./campaign-store.js";
 import { parseMultipartUpload, uploadBufferToPinata } from "./pinata.js";
 import { getAssistantReply, type AssistantMessage } from "./assistant.js";
-import { buildEmbedFrameHtml, buildEmbedScript, getPublicCampaignById, getPublicCampaignBySlotId } from "./public-campaigns.js";
+import { buildEmbedFrameHtml, buildEmbedScript, createEmbedFramePayload, getPublicCampaignById, getPublicCampaignBySlotId } from "./public-campaigns.js";
 import { assignSlotCampaign, createSlot, getSlots, sanitizeSlotMetadata } from "./slot-store.js";
 import { assertSignedRequest } from "./request-auth.js";
+import { getAssignedCampaignId, getCampaignHoster, getSlotDeveloper } from "./chain-state.js";
+import { buildMeasurementEventKey, buildMeasurementFingerprint, verifyMeasurementToken } from "./measurement.js";
+import { recordMeasurement } from "./measurement-store.js";
+import { markMeasurementPending, replayPendingMeasurements, syncMeasurementToChain } from "./settlement-service.js";
 
 const app = express();
 const localhostOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
@@ -63,23 +67,23 @@ app.get("/api/public-campaign", async (req, res) => {
 
 app.get("/api/embed", async (req, res) => {
   const mode = String(req.query.mode ?? "script");
-  const campaignId = Number(req.query.campaignId);
   const slotId = Number(req.query.slotId);
   const hasSlotId = Number.isFinite(slotId) && slotId > 0;
-  const hasCampaignId = Number.isFinite(campaignId) && campaignId > 0;
 
-  if (!hasSlotId && !hasCampaignId) {
+  if (!hasSlotId) {
     res
       .status(400)
       .type(mode === "frame" ? "text/html" : "application/javascript")
-      .send(mode === "frame" ? "<p>AdNode slotId or campaignId is required.</p>" : "console.error('AdNode slotId or campaignId is required.');");
+      .send(mode === "frame" ? "<p>AdNode slotId is required.</p>" : "console.error('AdNode slotId is required.');");
     return;
   }
 
   if (mode === "frame") {
     try {
-      const campaign = hasSlotId ? await getPublicCampaignBySlotId(slotId) : await getPublicCampaignById(campaignId);
-      res.type("text/html").send(buildEmbedFrameHtml(campaign));
+      const campaign = await getPublicCampaignBySlotId(slotId);
+      const origin = `${req.protocol}://${req.get("host")}`;
+      const payload = createEmbedFramePayload(campaign, origin);
+      res.type("text/html").send(buildEmbedFrameHtml(payload.campaign, { origin: payload.origin, measurementToken: payload.measurementToken }));
     } catch (error) {
       res.status(404).type("text/html").send(`<p>${error instanceof Error ? error.message : "Campaign not found."}</p>`);
     }
@@ -87,50 +91,153 @@ app.get("/api/embed", async (req, res) => {
   }
 
   const origin = `${req.protocol}://${req.get("host")}`;
-  res.type("application/javascript").send(buildEmbedScript(origin, hasSlotId ? { slotId } : { campaignId }));
+  res.type("application/javascript").send(buildEmbedScript(origin, { slotId }));
 });
 
 app.get("/api/embed.js", async (req, res) => {
-  const campaignId = Number(req.query.campaignId);
   const slotId = Number(req.query.slotId);
   const hasSlotId = Number.isFinite(slotId) && slotId > 0;
-  const hasCampaignId = Number.isFinite(campaignId) && campaignId > 0;
 
-  if (!hasSlotId && !hasCampaignId) {
-    res.status(400).type("application/javascript").send("console.error('AdNode slotId or campaignId is required.');");
+  if (!hasSlotId) {
+    res.status(400).type("application/javascript").send("console.error('AdNode slotId is required.');");
     return;
   }
 
   const origin = `${req.protocol}://${req.get("host")}`;
-  res.type("application/javascript").send(buildEmbedScript(origin, hasSlotId ? { slotId } : { campaignId }));
+  res.type("application/javascript").send(buildEmbedScript(origin, { slotId }));
 });
 
 app.get("/api/embed-frame", async (req, res) => {
-  const campaignId = Number(req.query.campaignId);
   const slotId = Number(req.query.slotId);
   const hasSlotId = Number.isFinite(slotId) && slotId > 0;
-  const hasCampaignId = Number.isFinite(campaignId) && campaignId > 0;
 
-  if (!hasSlotId && !hasCampaignId) {
-    res.status(400).type("text/html").send("<p>AdNode slotId or campaignId is required.</p>");
+  if (!hasSlotId) {
+    res.status(400).type("text/html").send("<p>AdNode slotId is required.</p>");
     return;
   }
 
   try {
-    const campaign = hasSlotId ? await getPublicCampaignBySlotId(slotId) : await getPublicCampaignById(campaignId);
-    res.type("text/html").send(buildEmbedFrameHtml(campaign));
+    const campaign = await getPublicCampaignBySlotId(slotId);
+    const origin = `${req.protocol}://${req.get("host")}`;
+    const payload = createEmbedFramePayload(campaign, origin);
+    res.type("text/html").send(buildEmbedFrameHtml(payload.campaign, { origin: payload.origin, measurementToken: payload.measurementToken }));
   } catch (error) {
     res.status(404).type("text/html").send(`<p>${error instanceof Error ? error.message : "Campaign not found."}</p>`);
   }
 });
 
-app.post("/api/campaigns", async (req, res) => {
-  const payload = sanitizeCampaignMetadata(req.body as Record<string, unknown>);
+app.post("/api/measure", async (req, res) => {
+  const body = (req.body as Record<string, unknown>) ?? {};
+  const token = String(body.token ?? "");
+  const eventType = String(body.eventType ?? "");
+  const pageUrl = String(body.pageUrl ?? "");
+  const referrer = String(body.referrer ?? "");
+
+  if (!token || (eventType !== "impression" && eventType !== "click")) {
+    res.status(400).json({ error: "token and valid eventType are required." });
+    return;
+  }
+
+  let verifiedToken;
+  try {
+    verifiedToken = verifyMeasurementToken(token);
+  } catch (error) {
+    res.status(401).json({ error: error instanceof Error ? error.message : "Invalid measurement token." });
+    return;
+  }
+
+  let campaign;
+  try {
+    campaign = await getPublicCampaignBySlotId(Number(verifiedToken.chainSlotId));
+  } catch (error) {
+    res.status(404).json({ error: error instanceof Error ? error.message : "Assigned campaign not found." });
+    return;
+  }
+
+  if (campaign.id !== verifiedToken.chainCampaignId) {
+    res.status(409).json({ error: "Embed token campaign assignment no longer matches slot state." });
+    return;
+  }
+
+  const forwardedFor = req.headers["x-forwarded-for"];
+  const ip = Array.isArray(forwardedFor) ? forwardedFor[0] ?? "" : String(forwardedFor ?? req.socket.remoteAddress ?? "");
+  const userAgent = String(req.headers["user-agent"] ?? "");
+  const fingerprint = buildMeasurementFingerprint({
+    ip,
+    userAgent,
+    eventType,
+    pageUrl,
+  });
+  const eventKey = buildMeasurementEventKey({
+    chainCampaignId: campaign.id,
+    chainSlotId: campaign.slotId,
+    eventType,
+    fingerprint,
+  });
+
+  const { duplicate, record } = await recordMeasurement({
+    eventKey,
+    chainCampaignId: campaign.id,
+    chainSlotId: campaign.slotId,
+    eventType,
+    pricingModel: campaign.pricingModel,
+    rate: campaign.rate,
+    pageUrl,
+    referrer,
+    fingerprint,
+  });
+
+  if (duplicate) {
+    res.status(202).json({ ok: true, duplicate: true });
+    return;
+  }
 
   try {
-    await assertSignedRequest(req.headers, "campaigns:create", payload);
+    const result = await syncMeasurementToChain(record);
+    res.status(202).json({ ok: true, duplicate: false, settlement: result });
+  } catch (error) {
+    await markMeasurementPending(record, error);
+    res.status(202).json({
+      ok: true,
+      duplicate: false,
+      settlement: { status: "pending_chain" },
+      warning: error instanceof Error ? error.message : "Chain sync failed.",
+    });
+  }
+});
+
+app.post("/api/settlement/replay", async (_req, res) => {
+  try {
+    const summary = await replayPendingMeasurements();
+    res.json({ ok: true, ...summary });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Settlement replay failed." });
+  }
+});
+
+app.post("/api/campaigns", async (req, res) => {
+  const candidate = sanitizeCampaignMetadata(req.body as Record<string, unknown>);
+  let signerAddress = "";
+
+  try {
+    signerAddress = await assertSignedRequest(req.headers, "campaigns:create", candidate);
   } catch (error) {
     res.status(401).json({ error: error instanceof Error ? error.message : "Unauthorized request." });
+    return;
+  }
+
+  const payload = sanitizeCampaignMetadata({
+    ...candidate,
+    advertiser: signerAddress,
+  });
+
+  try {
+    const onchainHoster = await getCampaignHoster(payload.chainCampaignId);
+    if (onchainHoster.toLowerCase() !== signerAddress) {
+      throw new Error("Signed wallet does not own this on-chain campaign.");
+    }
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : "Campaign ownership check failed." });
     return;
   }
 
@@ -139,12 +246,28 @@ app.post("/api/campaigns", async (req, res) => {
 });
 
 app.post("/api/slots", async (req, res) => {
-  const payload = sanitizeSlotMetadata(req.body as Record<string, unknown>);
+  const candidate = sanitizeSlotMetadata(req.body as Record<string, unknown>);
+  let signerAddress = "";
 
   try {
-    await assertSignedRequest(req.headers, "slots:create", payload);
+    signerAddress = await assertSignedRequest(req.headers, "slots:create", candidate);
   } catch (error) {
     res.status(401).json({ error: error instanceof Error ? error.message : "Unauthorized request." });
+    return;
+  }
+
+  const payload = sanitizeSlotMetadata({
+    ...candidate,
+    developer: signerAddress,
+  });
+
+  try {
+    const onchainDeveloper = await getSlotDeveloper(payload.chainSlotId);
+    if (onchainDeveloper.toLowerCase() !== signerAddress) {
+      throw new Error("Signed wallet does not own this on-chain slot.");
+    }
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : "Slot ownership check failed." });
     return;
   }
 
@@ -155,11 +278,28 @@ app.post("/api/slots", async (req, res) => {
 async function handleSlotAssignment(req: Request, res: Response) {
   const payload = { assignedCampaignId: String((req.body as Record<string, unknown>)?.assignedCampaignId ?? "") };
   const chainSlotId = String(req.params.chainSlotId ?? req.query.chainSlotId ?? "");
+  let signerAddress = "";
 
   try {
-    await assertSignedRequest(req.headers, "slots:assign", payload);
+    signerAddress = await assertSignedRequest(req.headers, "slots:assign", payload);
   } catch (error) {
     res.status(401).json({ error: error instanceof Error ? error.message : "Unauthorized request." });
+    return;
+  }
+
+  try {
+    const onchainDeveloper = await getSlotDeveloper(chainSlotId);
+    const onchainAssignment = await getAssignedCampaignId(chainSlotId);
+
+    if (onchainDeveloper.toLowerCase() !== signerAddress) {
+      throw new Error("Signed wallet does not own this on-chain slot.");
+    }
+
+    if (onchainAssignment !== payload.assignedCampaignId) {
+      throw new Error("On-chain slot assignment does not match the requested campaign.");
+    }
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : "Slot assignment verification failed." });
     return;
   }
 
@@ -225,3 +365,12 @@ getDatabaseReady().then((databaseReady) => {
 app.listen(port, () => {
   console.log(`AdNode API listening on http://localhost:${port}`);
 });
+
+if (process.env.ADNODE_SETTLEMENT_REPLAY_INTERVAL_MS) {
+  const intervalMs = Math.max(15_000, Number(process.env.ADNODE_SETTLEMENT_REPLAY_INTERVAL_MS));
+  setInterval(() => {
+    void replayPendingMeasurements().catch((error) => {
+      console.error("AdNode settlement replay failed:", error instanceof Error ? error.message : error);
+    });
+  }, intervalMs);
+}

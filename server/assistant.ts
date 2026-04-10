@@ -10,27 +10,22 @@ const FAQ_ENTRIES: Array<{
   {
     test: (text) => text.includes("what is adnode"),
     reply:
-      "AdNode is a decentralized advertising network on Fhenix Arbitrum Sepolia where campaign budgets, bids, analytics, and earnings stay encrypted on-chain with FHE. Only the creative URI and category are public.",
+      "AdNode is a decentralized advertising network on Fhenix Arbitrum Sepolia where campaign strategy and lifetime earnings stay encrypted on-chain with FHE. Public metadata is limited to creatives, categories, and slot information.",
   },
   {
     test: (text) => text.includes("what problem does adnode solve") || (text.includes("problem") && text.includes("adnode")),
     reply:
-      "Transparent blockchains expose budgets, bids, and performance in real time. AdNode fixes that by encrypting financial data before it reaches the chain, so contracts can compute on it without exposing strategy.",
+      "Transparent blockchains expose campaign budgets, payout terms, and performance in real time. AdNode fixes that by encrypting financial data before it reaches the chain, so contracts can compute on it without exposing strategy.",
   },
   {
     test: (text) => text.includes("what is fhe"),
     reply:
-      "FHE means Fully Homomorphic Encryption. It lets AdNode compute on encrypted values like budgets, bids, impressions, clicks, and earnings without decrypting them on-chain.",
+      "FHE means Fully Homomorphic Encryption. It lets AdNode compute on encrypted values like budgets, campaign rates, impressions, clicks, and earnings without decrypting them on-chain.",
   },
   {
     test: (text) => text.includes("who can see my campaign budget") || (text.includes("see my budget") && text.includes("campaign")),
     reply:
       "Only you can view your campaign budget. It is encrypted in the browser, stored encrypted on-chain, and later decrypted with your own wallet permit.",
-  },
-  {
-    test: (text) => text.includes("can competitors see my bids") || (text.includes("competitors") && text.includes("bids")),
-    reply:
-      "No. Bids are submitted as encrypted values, so competitors cannot inspect them. The intended auction flow compares encrypted values without revealing losing bids.",
   },
   {
     test: (text) => text.includes("what data is public"),
@@ -53,17 +48,12 @@ const FAQ_ENTRIES: Array<{
       text.includes("how do developers earn") ||
       (text.includes("who earns") && text.includes("ad placements")),
     reply:
-      "Developers are the publishers on AdNode. They earn by registering ad slots and serving campaigns in those placements. Their earnings are tracked on-chain as encrypted values, and only the developer can decrypt or withdraw them.",
+      "Developers are the publishers on AdNode. They earn by registering ad slots and serving campaigns in those placements. Lifetime earnings stay encrypted for the developer, while funded payouts become claimable after an authorized settlement service books delivery.",
   },
   {
     test: (text) => text.includes("how do i add an ad creative") || (text.includes("add") && text.includes("creative")),
     reply:
       "Upload an image or MP4 creative through AdNode or paste a public creative URL. Uploaded creatives are pinned to IPFS and stored as an `ipfs://` campaign creative URI.",
-  },
-  {
-    test: (text) => text.includes("is the auction fair"),
-    reply:
-      "The intended design is a sealed auction where encrypted bids prevent front-running and bid snooping. If the live auction module is not enabled in the current build, AdNode should present it as coming soon rather than claim it is active.",
   },
   {
     test: (text) => text.includes("open source"),

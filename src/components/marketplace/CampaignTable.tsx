@@ -45,6 +45,16 @@ export function CampaignTable({ campaigns }: { campaigns: ContractCampaign[] }) 
                 {campaign.category}
               </span>
             </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[20px] bg-white/70 p-4 text-sm dark:bg-white/5">
+                <p className="text-muted-foreground">Pricing model</p>
+                <p className="mt-2 font-medium">{campaign.pricingModel}</p>
+              </div>
+              <div className="rounded-[20px] bg-white/70 p-4 text-sm dark:bg-white/5">
+                <p className="text-muted-foreground">Rate</p>
+                <p className="mt-2 font-medium">{campaign.rate ? `${campaign.rate} ETH` : "Set by hoster"}</p>
+              </div>
+            </div>
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <a
                 className="inline-flex items-center justify-center rounded-full bg-secondary px-5 py-3 text-sm font-semibold text-secondary-foreground transition hover:bg-secondary/80"

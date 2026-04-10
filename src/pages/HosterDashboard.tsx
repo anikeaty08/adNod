@@ -1,23 +1,30 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CampaignForm } from "@/components/dashboard/CampaignForm";
 import { CampaignCard } from "@/components/dashboard/CampaignCard";
 import { PerformancePanel } from "@/components/dashboard/PerformancePanel";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StatsCard } from "@/components/shared/StatsCard";
+import { Button } from "@/components/shared/Button";
 import { useCampaignMetrics, useCampaigns } from "@/hooks/useCampaigns";
 import { useAdNode } from "@/hooks/useAdNode";
 import { useWallet } from "@/context/WalletContext";
 
 export function HosterDashboard() {
   const { data: campaigns = [] } = useCampaigns();
-  const { isConfigured, setCampaignActive, getMyBudget, getMyStats } = useAdNode();
+  const { isConfigured, setCampaignActive, getMyBudget, getMyStats, fundCampaign } = useAdNode();
   const { connected, address } = useWallet();
   const [updatingCampaignId, setUpdatingCampaignId] = useState<number | null>(null);
   const [decryptingBudgetCampaignId, setDecryptingBudgetCampaignId] = useState<number | null>(null);
   const [decryptingStatsCampaignId, setDecryptingStatsCampaignId] = useState<number | null>(null);
+  const [fundingCampaignId, setFundingCampaignId] = useState<number | null>(null);
+  const [topUpAmounts, setTopUpAmounts] = useState<Record<string, string>>({});
   const [decryptedCampaigns, setDecryptedCampaigns] = useState<Record<string, { budget: string | null; impressions: number | null; clicks: number | null; status: string | null }>>({});
   const ownedCampaigns = address ? campaigns.filter((campaign) => campaign.advertiser.toLowerCase() === address.toLowerCase()) : [];
   const metrics = useCampaignMetrics(ownedCampaigns);
+  const totalAvailableEscrow = useMemo(
+    () => ownedCampaigns.reduce((sum, campaign) => sum + Number(campaign.availableEscrowEth || 0), 0).toFixed(3),
+    [ownedCampaigns],
+  );
   const hosterMetrics = [
     {
       label: "Campaigns created",
@@ -30,9 +37,9 @@ export function HosterDashboard() {
       hint: ownedCampaigns.length ? "Currently available to publishers" : "Create and activate your first campaign",
     },
     {
-      label: "Encrypted budgets",
-      value: ownedCampaigns.length ? "On-chain" : "Locked",
-      hint: connected ? "Decrypt a campaign budget directly from its card." : "Connect your wallet to decrypt campaign budgets.",
+      label: "Available escrow",
+      value: ownedCampaigns.length ? `${totalAvailableEscrow} ETH` : "0 ETH",
+      hint: "Campaign funding is now explicit and withdrawable only after the campaign is paused.",
     },
     {
       label: "Analytics access",
@@ -128,15 +135,29 @@ export function HosterDashboard() {
     }
   };
 
+  const handleFundCampaign = async (campaignId: number) => {
+    const amount = topUpAmounts[String(campaignId)]?.trim() ?? "";
+    if (!amount) {
+      return;
+    }
+
+    setFundingCampaignId(campaignId);
+    try {
+      await fundCampaign(campaignId, amount);
+    } finally {
+      setFundingCampaignId(null);
+    }
+  };
+
   return (
     <section className="page-shell py-12 sm:py-16">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm uppercase tracking-[0.2em] text-sky-700 dark:text-sky-300">Hoster dashboard</p>
-          <h1 className="mt-3 font-display text-4xl font-semibold">Commercial-grade campaign control.</h1>
+          <h1 className="mt-3 font-display text-4xl font-semibold">Fund and manage encrypted campaigns.</h1>
         </div>
         <p className="max-w-xl text-sm text-muted-foreground">
-          Monitor verified performance, refresh escrow, and manage pricing models from one chain-native console.
+          Launch campaigns with real escrow, decrypt owner-only metrics, and keep funding controls anchored to on-chain state.
         </p>
       </div>
       <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -156,21 +177,47 @@ export function HosterDashboard() {
       <div className="mt-8 grid gap-5">
         {ownedCampaigns.length ? (
           ownedCampaigns.map((campaign) => (
-            <CampaignCard
-              key={campaign.id}
-              campaign={campaign}
-              showControls={Boolean(address) && campaign.advertiser.toLowerCase() === address?.toLowerCase()}
-              onToggleActive={(campaignId, nextActive) => void handleToggleCampaign(campaignId, nextActive)}
-              isUpdating={updatingCampaignId === Number(campaign.id)}
-              onDecryptBudget={(campaignId) => void handleDecryptBudget(campaignId)}
-              onDecryptStats={(campaignId) => void handleDecryptStats(campaignId)}
-              isDecryptingBudget={decryptingBudgetCampaignId === Number(campaign.id)}
-              isDecryptingStats={decryptingStatsCampaignId === Number(campaign.id)}
-              decryptedBudget={decryptedCampaigns[campaign.id]?.budget ?? null}
-              decryptedImpressions={decryptedCampaigns[campaign.id]?.impressions ?? null}
-              decryptedClicks={decryptedCampaigns[campaign.id]?.clicks ?? null}
-              decryptStatus={decryptedCampaigns[campaign.id]?.status ?? null}
-            />
+            <div key={campaign.id} className="space-y-4">
+              <CampaignCard
+                campaign={campaign}
+                showControls={Boolean(address) && campaign.advertiser.toLowerCase() === address?.toLowerCase()}
+                onToggleActive={(campaignId, nextActive) => void handleToggleCampaign(campaignId, nextActive)}
+                isUpdating={updatingCampaignId === Number(campaign.id)}
+                onDecryptBudget={(campaignId) => void handleDecryptBudget(campaignId)}
+                onDecryptStats={(campaignId) => void handleDecryptStats(campaignId)}
+                isDecryptingBudget={decryptingBudgetCampaignId === Number(campaign.id)}
+                isDecryptingStats={decryptingStatsCampaignId === Number(campaign.id)}
+                decryptedBudget={decryptedCampaigns[campaign.id]?.budget ?? null}
+                decryptedImpressions={decryptedCampaigns[campaign.id]?.impressions ?? null}
+                decryptedClicks={decryptedCampaigns[campaign.id]?.clicks ?? null}
+                decryptStatus={decryptedCampaigns[campaign.id]?.status ?? null}
+              />
+              <div className="glass-panel rounded-[24px] p-5">
+                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Top up campaign escrow</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Add more funded balance without recreating the campaign.</p>
+                  </div>
+                  <div className="flex w-full max-w-md flex-col gap-3 sm:flex-row">
+                    <input
+                      type="text"
+                      className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
+                      placeholder="0.1"
+                      value={topUpAmounts[campaign.id] ?? ""}
+                      onChange={(event) =>
+                        setTopUpAmounts((current) => ({
+                          ...current,
+                          [campaign.id]: event.target.value,
+                        }))
+                      }
+                    />
+                    <Button type="button" onClick={() => void handleFundCampaign(Number(campaign.id))} disabled={fundingCampaignId === Number(campaign.id)}>
+                      {fundingCampaignId === Number(campaign.id) ? "Funding..." : "Top up"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
           ))
         ) : (
           <EmptyState

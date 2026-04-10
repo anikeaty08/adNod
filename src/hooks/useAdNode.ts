@@ -3,16 +3,19 @@ import { Encryptable, FheTypes } from "@cofhe/sdk";
 import { useAccount, useConnect, usePublicClient, useWalletClient, useWriteContract } from "wagmi";
 import { readContract } from "@wagmi/core";
 import { waitForTransactionReceipt } from "viem/actions";
-import { decodeEventLog, formatEther } from "viem";
+import { decodeEventLog, formatEther, formatUnits, parseUnits, type Address } from "viem";
 import {
   wagmiConfig,
   adRegistryAbiTyped,
   adRegistryAddress,
   adAnalyticsAbiTyped,
   adAnalyticsAddress,
+  adNodePayoutWrapperAbiTyped,
   encryptedInputToSolidity,
   formatBudgetToChainUnits,
+  formatPayoutTokenUnits,
   getCofheClient,
+  parseRateToMicrounits,
 } from "@/lib/contract-client";
 import { saveCampaignMetadata, fetchCampaignMetadata, fetchSlots, saveSlot, updateSlotAssignment } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
@@ -26,9 +29,25 @@ export function useAdNode() {
   const isConfigured = Boolean(adRegistryAddress && adAnalyticsAddress);
 
   const assertConfigured = () => {
-    if (!isConfigured) {
-      throw new Error("Fhenix contract addresses or RPC URL are missing from the environment.");
+    if (!isConfigured || !adRegistryAddress || !adAnalyticsAddress) {
+      throw new Error("Fhenix contract addresses are missing from the environment. Deploy the contracts and set VITE_ADREGISTRY_ADDRESS and VITE_ADANALYTICS_ADDRESS.");
     }
+  };
+
+  const assertRegistryConfigured = () => {
+    if (!adRegistryAddress) {
+      throw new Error("AdRegistry is not configured yet.");
+    }
+  };
+
+  const getRegistryAddress = (): Address => {
+    assertRegistryConfigured();
+    return adRegistryAddress as Address;
+  };
+
+  const getAnalyticsAddress = (): Address => {
+    assertConfigured();
+    return adAnalyticsAddress as Address;
   };
 
   const toReadableDecryptError = (error: unknown, ownerMessage: string) => {
@@ -40,14 +59,14 @@ export function useAdNode() {
     }
 
     if (normalized.includes("user rejected") || normalized.includes("rejected")) {
-      return new Error("Decrypt cancelled — wallet signature was not approved.");
+      return new Error("Decrypt cancelled - wallet signature was not approved.");
     }
 
     if (normalized.includes("permit")) {
-      return new Error("Decrypt failed — wallet permit could not be created.");
+      return new Error("Decrypt failed - wallet permit could not be created.");
     }
 
-    return new Error("Decrypt failed — please retry with the connected owner wallet.");
+    return new Error("Decrypt failed - please retry with the connected owner wallet.");
   };
 
   return useMemo(
@@ -57,31 +76,39 @@ export function useAdNode() {
       isPending,
       isConfigured,
       connectWallet: async () => {
-        if (!connectors.length) throw new Error("No wallet connector available.");
+        if (!connectors.length) throw new Error("WalletConnect is not configured.");
         await connectAsync({ connector: connectors[0] });
       },
       createCampaign: async (params: {
         creativeURI: string;
         category: string;
         budget: string;
-        cpc: number;
+        initialFunding: string;
+        cpc: string;
         title: string;
         description: string;
+        pricingModel?: "CPC" | "CPM";
       }) => {
         assertConfigured();
         if (!walletClient || !publicClient || !address) {
           throw new Error("Wallet is not connected.");
         }
 
-        const cofheClient = await getCofheClient();
+        const initialFunding = formatBudgetToChainUnits(params.initialFunding);
+        const registryAddress = getRegistryAddress();
+        if (initialFunding <= 0n) {
+          throw new Error("Initial funding must be greater than zero.");
+        }
+
+        const cofheClient = await getCofheClient(walletClient);
         const [encryptedBudget, encryptedCpc] = await cofheClient
-          .encryptInputs([Encryptable.uint64(formatBudgetToChainUnits(params.budget)), Encryptable.uint32(BigInt(params.cpc))])
+          .encryptInputs([Encryptable.uint64(formatBudgetToChainUnits(params.budget)), Encryptable.uint32(BigInt(parseRateToMicrounits(params.cpc)))])
           .setAccount(address)
           .setChainId(walletClient.chain.id)
           .execute();
 
         const hash = await writeContractAsync({
-          address: adRegistryAddress,
+          address: registryAddress,
           abi: adRegistryAbiTyped,
           functionName: "createCampaign",
           args: [
@@ -90,12 +117,13 @@ export function useAdNode() {
             encryptedInputToSolidity(encryptedBudget as Parameters<typeof encryptedInputToSolidity>[0]),
             encryptedInputToSolidity(encryptedCpc as Parameters<typeof encryptedInputToSolidity>[0]),
           ],
+          value: initialFunding,
           chain: walletClient.chain,
           account: walletClient.account,
         });
 
         const receipt = await waitForTransactionReceipt(publicClient, { hash });
-        const createdLog = receipt.logs.find((log) => log.address.toLowerCase() === adRegistryAddress.toLowerCase());
+        const createdLog = receipt.logs.find((log) => log.address.toLowerCase() === registryAddress.toLowerCase());
 
         if (!createdLog) throw new Error("CampaignCreated event not found.");
 
@@ -120,6 +148,8 @@ export function useAdNode() {
               description: params.description,
               creativeURI: params.creativeURI,
               category: params.category,
+              pricingModel: params.pricingModel ?? "CPC",
+              rate: params.cpc,
               advertiser: address,
             },
             {
@@ -138,12 +168,41 @@ export function useAdNode() {
 
         return { hash, campaignId, metadataSaved };
       },
-      registerSlot: async (siteName: string, category: string) => {
-        assertConfigured();
-        if (!walletClient || !address || !publicClient) throw new Error("Wallet is not connected.");
+      fundCampaign: async (campaignId: number, amount: string) => {
+        assertRegistryConfigured();
+        if (!walletClient || !publicClient) throw new Error("Wallet is not connected.");
+        const registryAddress = getRegistryAddress();
+
+        const fundingAmount = formatBudgetToChainUnits(amount);
+        if (fundingAmount <= 0n) {
+          throw new Error("Funding amount must be greater than zero.");
+        }
 
         const hash = await writeContractAsync({
-          address: adRegistryAddress,
+          address: registryAddress,
+          abi: adRegistryAbiTyped,
+          functionName: "fundCampaign",
+          args: [BigInt(campaignId)],
+          value: fundingAmount,
+          chain: walletClient.chain,
+          account: walletClient.account,
+        });
+
+        await waitForTransactionReceipt(publicClient, { hash });
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["campaigns"] }),
+          queryClient.invalidateQueries({ queryKey: ["platform-stats"] }),
+        ]);
+
+        return hash;
+      },
+      registerSlot: async (siteName: string, category: string) => {
+        assertRegistryConfigured();
+        if (!walletClient || !address || !publicClient) throw new Error("Wallet is not connected.");
+        const registryAddress = getRegistryAddress();
+
+        const hash = await writeContractAsync({
+          address: registryAddress,
           abi: adRegistryAbiTyped,
           functionName: "registerSlot",
           args: [siteName, category],
@@ -152,7 +211,7 @@ export function useAdNode() {
         });
 
         const receipt = await waitForTransactionReceipt(publicClient, { hash });
-        const slotRegisteredLog = receipt.logs.find((log) => log.address.toLowerCase() === adRegistryAddress.toLowerCase());
+        const slotRegisteredLog = receipt.logs.find((log) => log.address.toLowerCase() === registryAddress.toLowerCase());
 
         if (!slotRegisteredLog) {
           throw new Error("SlotRegistered event not found.");
@@ -201,11 +260,12 @@ export function useAdNode() {
         return slot;
       },
       assignCampaignToSlot: async (slotId: number, campaignId: number) => {
-        assertConfigured();
+        assertRegistryConfigured();
         if (!walletClient || !publicClient || !address) throw new Error("Wallet is not connected.");
+        const registryAddress = getRegistryAddress();
 
         const hash = await writeContractAsync({
-          address: adRegistryAddress,
+          address: registryAddress,
           abi: adRegistryAbiTyped,
           functionName: "assignCampaignToSlot",
           args: [BigInt(slotId), BigInt(campaignId)],
@@ -225,7 +285,7 @@ export function useAdNode() {
             },
           );
         } catch {
-          // The chain remains the source of truth even if metadata sync fails.
+          // Chain state remains authoritative even if metadata sync fails.
         }
 
         await Promise.all([
@@ -239,9 +299,10 @@ export function useAdNode() {
       recordImpression: async (campaignId: number) => {
         assertConfigured();
         if (!walletClient) throw new Error("Wallet is not connected.");
+        const analyticsAddress = getAnalyticsAddress();
 
         return writeContractAsync({
-          address: adAnalyticsAddress,
+          address: analyticsAddress,
           abi: adAnalyticsAbiTyped,
           functionName: "recordImpression",
           args: [BigInt(campaignId)],
@@ -252,11 +313,12 @@ export function useAdNode() {
       getMyStats: async (campaignId: number) => {
         assertConfigured();
         if (!address || !walletClient) throw new Error("Wallet is not connected.");
+        const analyticsAddress = getAnalyticsAddress();
 
-        const cofheClient = await getCofheClient();
+        const cofheClient = await getCofheClient(walletClient);
         try {
           const result = (await readContract(wagmiConfig, {
-            address: adAnalyticsAddress,
+            address: analyticsAddress,
             abi: adAnalyticsAbiTyped,
             functionName: "getMyStats",
             args: [BigInt(campaignId)],
@@ -282,17 +344,18 @@ export function useAdNode() {
             ),
           };
         } catch (error) {
-          throw toReadableDecryptError(error, "Decrypt failed — check you are the campaign owner");
+          throw toReadableDecryptError(error, "Decrypt failed - check you are the campaign owner");
         }
       },
       getMyBudget: async (campaignId: number) => {
         assertConfigured();
         if (!address || !walletClient) throw new Error("Wallet is not connected.");
+        const registryAddress = getRegistryAddress();
 
-        const cofheClient = await getCofheClient();
+        const cofheClient = await getCofheClient(walletClient);
         try {
           const result = (await readContract(wagmiConfig, {
-            address: adRegistryAddress,
+            address: registryAddress,
             abi: adRegistryAbiTyped,
             functionName: "getMyBudget",
             args: [BigInt(campaignId)],
@@ -308,17 +371,18 @@ export function useAdNode() {
               .execute(),
           );
         } catch (error) {
-          throw toReadableDecryptError(error, "Decrypt failed — check you are the campaign owner");
+          throw toReadableDecryptError(error, "Decrypt failed - check you are the campaign owner");
         }
       },
       getMyEarnings: async () => {
         assertConfigured();
         if (!address || !walletClient) throw new Error("Wallet is not connected.");
+        const analyticsAddress = getAnalyticsAddress();
 
-        const cofheClient = await getCofheClient();
+        const cofheClient = await getCofheClient(walletClient);
         try {
           const result = (await readContract(wagmiConfig, {
-            address: adAnalyticsAddress,
+            address: analyticsAddress,
             abi: adAnalyticsAbiTyped,
             functionName: "getMyEarnings",
           })) as bigint;
@@ -333,15 +397,177 @@ export function useAdNode() {
               .execute(),
           );
         } catch (error) {
-          throw toReadableDecryptError(error, "Decrypt failed — check you are using the correct developer wallet");
+          throw toReadableDecryptError(error, "Decrypt failed - check you are using the correct developer wallet");
         }
       },
-      setCampaignActive: async (campaignId: number, active: boolean) => {
-        assertConfigured();
+      getMyClaimableEarnings: async () => {
+        assertRegistryConfigured();
+        if (!address) throw new Error("Wallet is not connected.");
+        const registryAddress = getRegistryAddress();
+
+        const result = (await readContract(wagmiConfig, {
+          address: registryAddress,
+          abi: adRegistryAbiTyped,
+          functionName: "claimableEarnings",
+          args: [address],
+        })) as bigint;
+
+        return formatEther(result);
+      },
+      claimMyEarnings: async () => {
+        assertRegistryConfigured();
         if (!walletClient || !publicClient) throw new Error("Wallet is not connected.");
+        const registryAddress = getRegistryAddress();
 
         const hash = await writeContractAsync({
-          address: adRegistryAddress,
+          address: registryAddress,
+          abi: adRegistryAbiTyped,
+          functionName: "claimMyEarnings",
+          args: [],
+          chain: walletClient.chain,
+          account: walletClient.account,
+        });
+
+        await waitForTransactionReceipt(publicClient, { hash });
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["campaigns"] }),
+          queryClient.invalidateQueries({ queryKey: ["platform-stats"] }),
+        ]);
+
+        return hash;
+      },
+      getPayoutWrapperAddress: async () => {
+        assertRegistryConfigured();
+        const registryAddress = getRegistryAddress();
+
+        return (await readContract(wagmiConfig, {
+          address: registryAddress,
+          abi: adRegistryAbiTyped,
+          functionName: "getPayoutWrapper",
+        })) as Address;
+      },
+      getMyShieldedPayoutBalance: async () => {
+        assertRegistryConfigured();
+        if (!address || !walletClient) throw new Error("Wallet is not connected.");
+
+        const wrapperAddress = await (async () => {
+          const registryAddress = getRegistryAddress();
+          return (await readContract(wagmiConfig, {
+            address: registryAddress,
+            abi: adRegistryAbiTyped,
+            functionName: "getPayoutWrapper",
+          })) as Address;
+        })();
+
+        const cofheClient = await getCofheClient(walletClient);
+        try {
+          const result = (await readContract(wagmiConfig, {
+            address: wrapperAddress,
+            abi: adNodePayoutWrapperAbiTyped,
+            functionName: "confidentialBalanceOf",
+            args: [address],
+          })) as bigint;
+          const permit = await cofheClient.permits.getOrCreateSelfPermit(walletClient.chain.id, address);
+          const clear = (await cofheClient
+            .decryptForView(result, FheTypes.Uint64)
+            .setAccount(address)
+            .setChainId(walletClient.chain.id)
+            .withPermit(permit)
+            .execute()) as bigint;
+
+          return formatPayoutTokenUnits(clear);
+        } catch (error) {
+          throw toReadableDecryptError(error, "Decrypt failed - check you are using the correct payout wallet");
+        }
+      },
+      beginUnshieldPayout: async (amount: string) => {
+        assertRegistryConfigured();
+        if (!walletClient || !publicClient || !address) throw new Error("Wallet is not connected.");
+
+        const wrapperAddress = (await readContract(wagmiConfig, {
+          address: getRegistryAddress(),
+          abi: adRegistryAbiTyped,
+          functionName: "getPayoutWrapper",
+        })) as Address;
+
+        const wrapperAmount = parseUnits(amount, 6);
+        if (wrapperAmount <= 0n) {
+          throw new Error("Unshield amount must be greater than zero.");
+        }
+
+        const hash = await writeContractAsync({
+          address: wrapperAddress,
+          abi: adNodePayoutWrapperAbiTyped,
+          functionName: "unshield",
+          args: [walletClient.account.address, walletClient.account.address, wrapperAmount],
+          chain: walletClient.chain,
+          account: walletClient.account,
+        });
+
+        await waitForTransactionReceipt(publicClient, { hash });
+        return hash;
+      },
+      getMyUnshieldClaims: async () => {
+        assertRegistryConfigured();
+        if (!address) throw new Error("Wallet is not connected.");
+
+        const wrapperAddress = (await readContract(wagmiConfig, {
+          address: getRegistryAddress(),
+          abi: adRegistryAbiTyped,
+          functionName: "getPayoutWrapper",
+        })) as Address;
+
+        const claims = (await readContract(wagmiConfig, {
+          address: wrapperAddress,
+          abi: adNodePayoutWrapperAbiTyped,
+          functionName: "getUserClaims",
+          args: [address],
+        })) as Array<{
+          to: Address;
+          ctHash: `0x${string}`;
+          requestedAmount: bigint;
+          decryptedAmount: bigint;
+          claimed: boolean;
+        }>;
+
+        return claims.map((claim) => ({
+          ...claim,
+          requestedAmountFormatted: formatUnits(claim.requestedAmount, 6),
+          decryptedAmountFormatted: formatUnits(claim.decryptedAmount, 6),
+        }));
+      },
+      completeUnshieldClaim: async (ctHash: `0x${string}`) => {
+        assertRegistryConfigured();
+        if (!address || !walletClient || !publicClient) throw new Error("Wallet is not connected.");
+
+        const wrapperAddress = (await readContract(wagmiConfig, {
+          address: getRegistryAddress(),
+          abi: adRegistryAbiTyped,
+          functionName: "getPayoutWrapper",
+        })) as Address;
+
+        const cofheClient = await getCofheClient(walletClient);
+        const decryptResult = await cofheClient.decryptForTx(ctHash).setAccount(address).setChainId(walletClient.chain.id).withoutPermit().execute();
+
+        const hash = await writeContractAsync({
+          address: wrapperAddress,
+          abi: adNodePayoutWrapperAbiTyped,
+          functionName: "claimUnshielded",
+          args: [decryptResult.ctHash as `0x${string}`, decryptResult.decryptedValue, decryptResult.signature],
+          chain: walletClient.chain,
+          account: walletClient.account,
+        });
+
+        await waitForTransactionReceipt(publicClient, { hash });
+        return hash;
+      },
+      setCampaignActive: async (campaignId: number, active: boolean) => {
+        assertRegistryConfigured();
+        if (!walletClient || !publicClient) throw new Error("Wallet is not connected.");
+        const registryAddress = getRegistryAddress();
+
+        const hash = await writeContractAsync({
+          address: registryAddress,
           abi: adRegistryAbiTyped,
           functionName: "setCampaignActive",
           args: [BigInt(campaignId), active],
@@ -358,13 +584,29 @@ export function useAdNode() {
         return hash;
       },
       getPublicCampaigns: async () => {
-        if (!isConfigured) {
-          return [];
+        const metadata = await fetchCampaignMetadata().catch(() => []);
+
+        if (!adRegistryAddress) {
+          return metadata.map((item) => ({
+            id: item.chainCampaignId,
+            title: item.title || `Campaign ${item.chainCampaignId}`,
+              description: item.description || "Campaign metadata pending on-chain sync",
+              creativeURI: item.creativeURI,
+              category: item.category,
+              pricingModel: item.pricingModel,
+              rate: item.rate,
+              status: "paused" as const,
+              advertiser: item.advertiser,
+            availableEscrowEth: null,
+            totalFundedEth: null,
+            totalSettledEth: null,
+          }));
         }
 
-        const metadata = await fetchCampaignMetadata().catch(() => []);
+        const registryAddress = getRegistryAddress();
+
         const nextId = (await readContract(wagmiConfig, {
-          address: adRegistryAddress,
+          address: registryAddress,
           abi: adRegistryAbiTyped,
           functionName: "nextCampaignId",
         })) as bigint;
@@ -373,17 +615,23 @@ export function useAdNode() {
           Array.from({ length: Number(nextId) - 1 }, async (_, index) => {
             const id = index + 1;
             const [creativeURI, category, active] = (await readContract(wagmiConfig, {
-              address: adRegistryAddress,
+              address: registryAddress,
               abi: adRegistryAbiTyped,
               functionName: "getPublicInfo",
               args: [BigInt(id)],
             })) as [string, string, boolean];
             const advertiser = (await readContract(wagmiConfig, {
-              address: adRegistryAddress,
+              address: registryAddress,
               abi: adRegistryAbiTyped,
               functionName: "campaignHoster",
               args: [BigInt(id)],
             })) as string;
+            const [availableFunds, totalFunded, totalSettled] = (await readContract(wagmiConfig, {
+              address: registryAddress,
+              abi: adRegistryAbiTyped,
+              functionName: "getCampaignFunding",
+              args: [BigInt(id)],
+            })) as [bigint, bigint, bigint];
             const metadataItem = metadata.find((item) => item.chainCampaignId === String(id));
 
             return {
@@ -392,9 +640,13 @@ export function useAdNode() {
               description: metadataItem?.description || "On-chain campaign",
               creativeURI,
               category,
-              pricingModel: "CPC" as const,
+              pricingModel: metadataItem?.pricingModel || ("CPC" as const),
+              rate: metadataItem?.rate || null,
               status: active ? ("active" as const) : ("paused" as const),
               advertiser,
+              availableEscrowEth: formatEther(availableFunds),
+              totalFundedEth: formatEther(totalFunded),
+              totalSettledEth: formatEther(totalSettled),
             };
           }),
         );
@@ -402,13 +654,16 @@ export function useAdNode() {
         return campaigns;
       },
       getPublicSlots: async () => {
-        if (!isConfigured) {
-          return fetchSlots().catch(() => []);
+        const metadata = await fetchSlots().catch(() => []);
+
+        if (!adRegistryAddress) {
+          return metadata;
         }
 
-        const metadata = await fetchSlots().catch(() => []);
+        const registryAddress = getRegistryAddress();
+
         const nextSlotId = (await readContract(wagmiConfig, {
-          address: adRegistryAddress,
+          address: registryAddress,
           abi: adRegistryAbiTyped,
           functionName: "nextSlotId",
         })) as bigint;
@@ -417,7 +672,7 @@ export function useAdNode() {
           Array.from({ length: Number(nextSlotId) - 1 }, async (_, index) => {
             const id = index + 1;
             const [developer, siteName, category, active, assignedCampaignId] = (await readContract(wagmiConfig, {
-              address: adRegistryAddress,
+              address: registryAddress,
               abi: adRegistryAbiTyped,
               functionName: "slots",
               args: [BigInt(id)],
@@ -440,8 +695,9 @@ export function useAdNode() {
         return slots;
       },
       getPlatformStats: async () => {
-        if (!isConfigured) {
-          const [metadata, slots] = await Promise.all([fetchCampaignMetadata().catch(() => []), fetchSlots().catch(() => [])]);
+        const [metadata, slots] = await Promise.all([fetchCampaignMetadata().catch(() => []), fetchSlots().catch(() => [])]);
+
+        if (!adRegistryAddress) {
           return {
             totalCampaigns: metadata.length,
             totalSlots: slots.length,
@@ -449,14 +705,15 @@ export function useAdNode() {
           };
         }
 
-        const [metadata, slots] = await Promise.all([fetchCampaignMetadata().catch(() => []), fetchSlots().catch(() => [])]);
+        const registryAddress = getRegistryAddress();
+
         const nextCampaignId = (await readContract(wagmiConfig, {
-          address: adRegistryAddress,
+          address: registryAddress,
           abi: adRegistryAbiTyped,
           functionName: "nextCampaignId",
         })) as bigint;
         const nextSlotId = (await readContract(wagmiConfig, {
-          address: adRegistryAddress,
+          address: registryAddress,
           abi: adRegistryAbiTyped,
           functionName: "nextSlotId",
         })) as bigint;

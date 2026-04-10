@@ -15,8 +15,9 @@ const schema = z.object({
   creativeURI: z.string().min(1),
   category: z.string().min(2),
   budget: z.string().min(1),
+  initialFunding: z.string().min(1),
   pricingModel: z.enum(["CPC", "CPM"]),
-  rate: z.coerce.number().int().positive(),
+  rate: z.string().regex(/^\d+(\.\d{1,6})?$/),
 });
 
 export function CampaignForm() {
@@ -41,14 +42,16 @@ export function CampaignForm() {
 
     setStatus("Registering campaign on AdNode...");
     try {
-      const result = await createCampaign({
-        creativeURI: values.creativeURI,
-        category: values.category,
-        budget: values.budget,
-        cpc: values.rate,
-        title: values.title,
-        description: values.description,
-      });
+        const result = await createCampaign({
+          creativeURI: values.creativeURI,
+          category: values.category,
+          budget: values.budget,
+          initialFunding: values.initialFunding,
+          cpc: values.rate,
+          title: values.title,
+          description: values.description,
+          pricingModel: values.pricingModel,
+        });
       setStatus(
         result.metadataSaved
           ? `Campaign ${result.campaignId} submitted on-chain. Tx: ${result.hash}`
@@ -101,12 +104,21 @@ export function CampaignForm() {
         </label>
         <div className="grid gap-4 lg:grid-cols-3">
           <label className="space-y-2 text-sm">
-            <span>Budget (ETH)</span>
+            <span>Confidential target budget (ETH)</span>
             <input
               type="text"
               className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
               placeholder="0.1"
               {...form.register("budget")}
+            />
+          </label>
+          <label className="space-y-2 text-sm">
+            <span>Initial escrow funding (ETH)</span>
+            <input
+              type="text"
+              className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
+              placeholder="0.1"
+              {...form.register("initialFunding")}
             />
           </label>
           <label className="space-y-2 text-sm">
@@ -116,13 +128,12 @@ export function CampaignForm() {
               <option value="CPM">CPM</option>
             </select>
           </label>
-          <label className="space-y-2 text-sm">
-            <span>Rate (whole CPC units)</span>
+          <label className="space-y-2 text-sm lg:col-span-3">
+            <span>Rate per billed action (ETH)</span>
             <input
-              type="number"
-              step="0.1"
+              type="text"
               className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
-              placeholder="0"
+              placeholder="0.010000"
               {...form.register("rate")}
             />
           </label>

@@ -1,14 +1,22 @@
 import { connectDatabase } from "./db.js";
 import { SlotModel } from "./models/Slot.js";
+import { slotMetadataSchema } from "./validators.js";
 
 const memorySlots: Record<string, unknown>[] = [];
-const slotFields = ["chainSlotId", "siteName", "siteUrl", "category", "dailyTrafficEstimate", "developer", "assignedCampaignId"] as const;
+export const slotFields = ["chainSlotId", "siteName", "siteUrl", "category", "dailyTrafficEstimate", "developer", "assignedCampaignId"] as const;
 
 export function sanitizeSlotMetadata(payload: Record<string, unknown>) {
-  return slotFields.reduce<Record<string, unknown>>((accumulator, field) => {
-    accumulator[field] = String(payload[field] ?? "");
-    return accumulator;
-  }, {});
+  const parsed = slotMetadataSchema.parse({
+    chainSlotId: String(payload.chainSlotId ?? ""),
+    siteName: String(payload.siteName ?? ""),
+    siteUrl: String(payload.siteUrl ?? ""),
+    category: String(payload.category ?? ""),
+    dailyTrafficEstimate: String(payload.dailyTrafficEstimate ?? ""),
+    developer: String(payload.developer ?? "").toLowerCase(),
+    assignedCampaignId: String(payload.assignedCampaignId ?? ""),
+  });
+
+  return parsed;
 }
 
 export async function getSlots() {
@@ -25,7 +33,13 @@ export async function createSlot(payload: Record<string, unknown>) {
 
   try {
     await connectDatabase();
-    return await SlotModel.create(sanitized);
+    return await SlotModel.findOneAndUpdate({ chainSlotId: sanitized.chainSlotId }, sanitized, {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true,
+    })
+      .select(slotFields.join(" "))
+      .lean();
   } catch {
     const localSlot = {
       ...sanitized,

@@ -23,9 +23,9 @@ export function Landing() {
           </div>
           <div className="grid gap-4 lg:col-span-2 sm:grid-cols-3">
             {[
-              "Create campaigns with public creatives and encrypted budgets and CPC values.",
-              "Encrypt all financial values in the browser before they are submitted on-chain.",
-              "Earn from active placements while campaign stats and earnings stay decryptable only by their owners.",
+              "Create campaigns with public creatives, encrypted strategy fields, and funded escrow.",
+              "Encrypt financial inputs in the browser before they are submitted on-chain.",
+              "Route developer payouts through slot-linked settlement instead of manual dashboard theater.",
             ].map((step, index) => (
               <div key={step} className="glass-panel rounded-[28px] p-6">
                 <p className="text-sm uppercase tracking-[0.2em] text-sky-700 dark:text-sky-300">Step 0{index + 1}</p>
@@ -50,7 +50,7 @@ export function Landing() {
             {[
               ["Campaigns", String(stats?.totalCampaigns ?? campaigns.length), "Pulled from campaign metadata and live chain state"],
               ["Registered slots", String(stats?.totalSlots ?? 0), "Developer inventory available for assignment"],
-              ["Verified tx", String(stats?.totalVerifiedTransactions ?? 1), "Encrypted transaction count surfaced on the platform"],
+              ["On-chain objects", String(stats?.totalVerifiedTransactions ?? 0), "Campaign and slot entities surfaced from the live contracts"],
               ["Settlement", "Encrypted", "Financial values remain sealed until the owner decrypts them"],
             ].map(([label, value, detail]) => (
               <div key={label} className="rounded-[26px] bg-white/80 p-5 dark:bg-white/5">

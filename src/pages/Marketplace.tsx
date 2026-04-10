@@ -28,7 +28,7 @@ export function Marketplace() {
       <SectionBadge>Open marketplace</SectionBadge>
       <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-display text-4xl font-semibold">Discover escrow-backed campaigns.</h1>
+          <h1 className="font-display text-4xl font-semibold">Discover funded campaigns.</h1>
           <p className="mt-3 max-w-2xl text-muted-foreground">
             Browse current campaign metadata, open public creative assets, and review what is live today.
           </p>

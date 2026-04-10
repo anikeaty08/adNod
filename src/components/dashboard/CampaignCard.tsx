@@ -63,7 +63,7 @@ export function CampaignCard({
           <img className="h-56 w-full object-cover" src={creativeUrl} alt={campaign.title} />
         )}
       </div>
-      <div className="mt-6 grid gap-3 sm:grid-cols-4">
+      <div className="mt-6 grid gap-3 sm:grid-cols-5">
         <div className="rounded-[22px] bg-white/70 p-4 dark:bg-white/5">
           <p className="text-sm text-muted-foreground">Creative</p>
           <a className="mt-2 line-clamp-2 font-medium text-sky-700 dark:text-sky-300" href={creativeUrl} target="_blank" rel="noreferrer">
@@ -71,8 +71,12 @@ export function CampaignCard({
           </a>
         </div>
         <div className="rounded-[22px] bg-white/70 p-4 dark:bg-white/5">
-          <p className="text-sm text-muted-foreground">Budget</p>
+          <p className="text-sm text-muted-foreground">Confidential budget</p>
           <p className="mt-2 font-semibold">{decryptedBudget ? `${decryptedBudget} ETH` : "Decrypt to view"}</p>
+        </div>
+        <div className="rounded-[22px] bg-white/70 p-4 dark:bg-white/5">
+          <p className="text-sm text-muted-foreground">Available escrow</p>
+          <p className="mt-2 font-semibold">{campaign.availableEscrowEth ? `${campaign.availableEscrowEth} ETH` : "No funding yet"}</p>
         </div>
         <div className="rounded-[22px] bg-white/70 p-4 dark:bg-white/5">
           <p className="text-sm text-muted-foreground">Impressions</p>

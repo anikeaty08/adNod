@@ -1,6 +1,5 @@
 import { Footer } from "@/components/layout/Footer";
 import { Navbar } from "@/components/layout/Navbar";
-import { AiAssistantWidget } from "@/components/platform/AiAssistantWidget";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -8,7 +7,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Navbar />
       <main>{children}</main>
       <Footer />
-      <AiAssistantWidget />
     </div>
   );
 }

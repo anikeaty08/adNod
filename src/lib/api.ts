@@ -13,6 +13,8 @@ export interface CampaignMetadata {
   description: string;
   creativeURI: string;
   category: string;
+  pricingModel: "CPC" | "CPM";
+  rate: string;
   advertiser: string;
 }
 
@@ -40,6 +42,8 @@ function normalizeCampaign(campaign: Record<string, unknown>): CampaignMetadata 
     description: String(campaign.description ?? ""),
     creativeURI: String(campaign.creativeURI ?? campaign.creativeUrl ?? ""),
     category: String(campaign.category ?? ""),
+    pricingModel: (String(campaign.pricingModel ?? "CPC") === "CPM" ? "CPM" : "CPC"),
+    rate: String(campaign.rate ?? "0"),
   };
 }
 
@@ -74,6 +78,8 @@ export async function saveCampaignMetadata(campaign: CampaignMetadata, auth: Req
       description: campaign.description,
       creativeURI: campaign.creativeURI,
       category: campaign.category,
+      pricingModel: campaign.pricingModel,
+      rate: campaign.rate,
       advertiser: campaign.advertiser,
     }),
   });

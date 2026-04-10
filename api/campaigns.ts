@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import "dotenv/config";
 import { createCampaign, getCampaigns, sanitizeCampaignMetadata } from "../server/campaign-store.js";
 import { assertSignedRequest } from "../server/request-auth.js";
+import { getCampaignHoster } from "../server/chain-state.js";
 
 async function readBody(req: IncomingMessage) {
   const chunks: Buffer[] = [];
@@ -26,13 +27,33 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   if (req.method === "POST") {
     const payload = (await readBody(req)) as Record<string, unknown>;
-    const sanitized = sanitizeCampaignMetadata(payload);
+    const candidate = sanitizeCampaignMetadata({
+      ...payload,
+      advertiser: String(payload.advertiser ?? ""),
+    });
+    let signerAddress = "";
 
     try {
-      await assertSignedRequest(req.headers, "campaigns:create", sanitized);
+      signerAddress = await assertSignedRequest(req.headers, "campaigns:create", candidate);
     } catch (error) {
       res.statusCode = 401;
       res.end(JSON.stringify({ error: error instanceof Error ? error.message : "Unauthorized request." }));
+      return;
+    }
+
+    const sanitized = sanitizeCampaignMetadata({
+      ...candidate,
+      advertiser: signerAddress,
+    });
+
+    try {
+      const onchainHoster = await getCampaignHoster(sanitized.chainCampaignId);
+      if (onchainHoster.toLowerCase() !== signerAddress) {
+        throw new Error("Signed wallet does not own this on-chain campaign.");
+      }
+    } catch (error) {
+      res.statusCode = 409;
+      res.end(JSON.stringify({ error: error instanceof Error ? error.message : "Campaign ownership check failed." }));
       return;
     }
 

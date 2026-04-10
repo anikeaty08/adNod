@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import "dotenv/config";
 import { assignSlotCampaign } from "../server/slot-store.js";
 import { assertSignedRequest } from "../server/request-auth.js";
+import { getAssignedCampaignId, getSlotDeveloper } from "../server/chain-state.js";
 
 async function readBody(req: IncomingMessage) {
   const chunks: Buffer[] = [];
@@ -32,12 +33,30 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   const chainSlotId = url.searchParams.get("chainSlotId") ?? "";
   const body = (await readBody(req)) as Record<string, unknown>;
   const payload = { assignedCampaignId: String(body.assignedCampaignId ?? "") };
+  let signerAddress = "";
 
   try {
-    await assertSignedRequest(req.headers, "slots:assign", payload);
+    signerAddress = await assertSignedRequest(req.headers, "slots:assign", payload);
   } catch (error) {
     res.statusCode = 401;
     res.end(JSON.stringify({ error: error instanceof Error ? error.message : "Unauthorized request." }));
+    return;
+  }
+
+  try {
+    const onchainDeveloper = await getSlotDeveloper(chainSlotId);
+    const onchainAssignment = await getAssignedCampaignId(chainSlotId);
+
+    if (onchainDeveloper.toLowerCase() !== signerAddress) {
+      throw new Error("Signed wallet does not own this on-chain slot.");
+    }
+
+    if (onchainAssignment !== payload.assignedCampaignId) {
+      throw new Error("On-chain slot assignment does not match the requested campaign.");
+    }
+  } catch (error) {
+    res.statusCode = 409;
+    res.end(JSON.stringify({ error: error instanceof Error ? error.message : "Slot assignment verification failed." }));
     return;
   }
 

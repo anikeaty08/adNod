@@ -6,8 +6,9 @@ export interface CampaignInput {
   creativeURI: string;
   category: string;
   budget: string;
+  initialFunding: string;
   pricingModel: PricingModel;
-  rate: number;
+  rate: string;
 }
 
 export interface ContractCampaign {
@@ -18,11 +19,15 @@ export interface ContractCampaign {
   category: string;
   advertiser: string;
   pricingModel: PricingModel;
+  rate?: string | null;
   status: "active" | "paused";
   encryptedBudget?: string | null;
   encryptedCpc?: string | null;
   impressions?: number | null;
   clicks?: number | null;
+  availableEscrowEth?: string | null;
+  totalFundedEth?: string | null;
+  totalSettledEth?: string | null;
 }
 
 export interface SlotMetadata {

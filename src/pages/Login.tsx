@@ -25,14 +25,14 @@ export function Login() {
         <div className="grid gap-6 md:grid-cols-2">
           <RoleCard
             title="Hoster"
-            description="Create privacy-aware campaigns, lock MAS escrow, and optimize verified delivery."
-            points={["Escrow-backed funding", "Campaign analytics", "CPC, CPM, and hybrid models"]}
+            description="Create privacy-aware campaigns, fund escrow on-chain, and manage owner-only analytics."
+            points={["Funded escrow", "Encrypted campaign analytics", "CPC campaigns live today"]}
             onSelect={() => handleSelect("hoster")}
           />
           <RoleCard
             title="Developer"
-            description="Integrate AdNode slots, browse campaigns, and receive automated MAS payouts."
-            points={["Framework snippets", "Marketplace access", "Performance earnings dashboard"]}
+            description="Integrate AdNode slots, browse funded campaigns, and claim slot-linked payouts."
+            points={["Framework snippets", "Marketplace access", "Claimable payout balance"]}
             onSelect={() => handleSelect("developer")}
           />
         </div>
