@@ -96,8 +96,8 @@ npm.cmd run dev
 
 ## Repo Docs
 
-- [docs/ADNODE_ARCHITECTURE.md](C:/Users/anike/Desktop/added/docs/ADNODE_ARCHITECTURE.md)
-- [Docs page](C:/Users/anike/Desktop/added/src/pages/Docs.tsx)
+- [Architecture](docs/ADNODE_ARCHITECTURE.md)
+- [Docs Page Source](src/pages/Docs.tsx)
 
 ## Commands
 
@@ -109,11 +109,11 @@ npx.cmd hardhat run scripts/deploy.cjs --network fhenixArbitrumSepolia
 
 ## Key Files
 
-- [src/lib/contract-client.ts](C:/Users/anike/Desktop/added/src/lib/contract-client.ts)
-- [src/context/WalletContext.tsx](C:/Users/anike/Desktop/added/src/context/WalletContext.tsx)
-- [src/components/shared/WalletConnectionModal.tsx](C:/Users/anike/Desktop/added/src/components/shared/WalletConnectionModal.tsx)
-- [src/pages/Docs.tsx](C:/Users/anike/Desktop/added/src/pages/Docs.tsx)
-- [server/settlement-service.ts](C:/Users/anike/Desktop/added/server/settlement-service.ts)
-- [server/public-campaigns.ts](C:/Users/anike/Desktop/added/server/public-campaigns.ts)
-- [contracts/AdRegistry.sol](C:/Users/anike/Desktop/added/contracts/AdRegistry.sol)
-- [contracts/AdAnalytics.sol](C:/Users/anike/Desktop/added/contracts/AdAnalytics.sol)
+- [src/lib/contract-client.ts](src/lib/contract-client.ts)
+- [src/context/WalletContext.tsx](src/context/WalletContext.tsx)
+- [src/components/shared/WalletConnectionModal.tsx](src/components/shared/WalletConnectionModal.tsx)
+- [src/pages/Docs.tsx](src/pages/Docs.tsx)
+- [server/settlement-service.ts](server/settlement-service.ts)
+- [server/public-campaigns.ts](server/public-campaigns.ts)
+- [contracts/AdRegistry.sol](contracts/AdRegistry.sol)
+- [contracts/AdAnalytics.sol](contracts/AdAnalytics.sol)

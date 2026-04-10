@@ -117,12 +117,12 @@ WRAPPED_NATIVE_TOKEN_ADDRESS=...
 
 ## Files To Know
 
-- [src/lib/contract-client.ts](C:/Users/anike/Desktop/added/src/lib/contract-client.ts)
-- [src/hooks/useAdNode.ts](C:/Users/anike/Desktop/added/src/hooks/useAdNode.ts)
-- [src/pages/Docs.tsx](C:/Users/anike/Desktop/added/src/pages/Docs.tsx)
-- [server/index.ts](C:/Users/anike/Desktop/added/server/index.ts)
-- [server/public-campaigns.ts](C:/Users/anike/Desktop/added/server/public-campaigns.ts)
-- [server/settlement-service.ts](C:/Users/anike/Desktop/added/server/settlement-service.ts)
-- [contracts/AdRegistry.sol](C:/Users/anike/Desktop/added/contracts/AdRegistry.sol)
-- [contracts/AdAnalytics.sol](C:/Users/anike/Desktop/added/contracts/AdAnalytics.sol)
-- [contracts/AdNodePayoutWrapper.sol](C:/Users/anike/Desktop/added/contracts/AdNodePayoutWrapper.sol)
+- [src/lib/contract-client.ts](../src/lib/contract-client.ts)
+- [src/hooks/useAdNode.ts](../src/hooks/useAdNode.ts)
+- [src/pages/Docs.tsx](../src/pages/Docs.tsx)
+- [server/index.ts](../server/index.ts)
+- [server/public-campaigns.ts](../server/public-campaigns.ts)
+- [server/settlement-service.ts](../server/settlement-service.ts)
+- [contracts/AdRegistry.sol](../contracts/AdRegistry.sol)
+- [contracts/AdAnalytics.sol](../contracts/AdAnalytics.sol)
+- [contracts/AdNodePayoutWrapper.sol](../contracts/AdNodePayoutWrapper.sol)
