@@ -96,7 +96,7 @@ npm.cmd run dev
 
 ## Repo Docs
 
-- [ADNODE_ARCHITECTURE.md](C:/Users/anike/Desktop/added/ADNODE_ARCHITECTURE.md)
+- [docs/ADNODE_ARCHITECTURE.md](C:/Users/anike/Desktop/added/docs/ADNODE_ARCHITECTURE.md)
 - [Docs page](C:/Users/anike/Desktop/added/src/pages/Docs.tsx)
 
 ## Commands

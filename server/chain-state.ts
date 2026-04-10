@@ -4,6 +4,7 @@ import adRegistryAbi from "../src/lib/abi/AdRegistry.json" with { type: "json" }
 const rpcUrl = process.env.VITE_FHENIX_RPC_URL || process.env.ARBITRUM_SEPOLIA_RPC_URL || "";
 const chainId = Number(process.env.VITE_CHAIN_ID || 421614);
 const adRegistryAddress = process.env.VITE_ADREGISTRY_ADDRESS as `0x${string}` | undefined;
+const adAnalyticsAddress = process.env.VITE_ADANALYTICS_ADDRESS as `0x${string}` | undefined;
 
 const chain = defineChain({
   id: chainId,
@@ -69,4 +70,4 @@ export async function getAssignedCampaignId(chainSlotId: string) {
   return assignedCampaignId.toString();
 }
 
-export { adRegistryAddress, publicClient as serverPublicClient };
+export { adRegistryAddress, adAnalyticsAddress, publicClient as serverPublicClient };

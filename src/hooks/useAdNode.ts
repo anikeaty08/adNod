@@ -549,6 +549,10 @@ export function useAdNode() {
         const cofheClient = await getCofheClient(walletClient);
         const decryptResult = await cofheClient.decryptForTx(ctHash).setAccount(address).setChainId(walletClient.chain.id).withoutPermit().execute();
 
+        if (!decryptResult.decryptedValue || BigInt(decryptResult.decryptedValue) <= 0n) {
+          throw new Error("This unshield claim decrypts to zero. Refresh your payout balance before retrying.");
+        }
+
         const hash = await writeContractAsync({
           address: wrapperAddress,
           abi: adNodePayoutWrapperAbiTyped,
