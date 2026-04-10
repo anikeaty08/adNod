@@ -1,4 +1,6 @@
+import type { WalletClient } from "viem";
 import type { ContractCampaign, SlotMetadata } from "@/lib/fhenix-contract";
+import { createSignedRequestAuth, toSignedHeaders } from "@/lib/request-auth";
 
 const isLocalPreview =
   typeof window !== "undefined" && (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost");
@@ -18,6 +20,16 @@ export interface PlatformStats {
   totalCampaigns: number;
   totalSlots: number;
   totalVerifiedTransactions: number;
+}
+
+export interface RequestAuthInput {
+  address: string;
+  walletClient: WalletClient;
+}
+
+async function readErrorMessage(response: Response, fallback: string) {
+  const payload = (await response.json().catch(() => ({ error: fallback }))) as { error?: string };
+  return payload.error || fallback;
 }
 
 function normalizeCampaign(campaign: Record<string, unknown>): CampaignMetadata {
@@ -43,11 +55,18 @@ export async function fetchCampaignMetadata(): Promise<CampaignMetadata[]> {
   return campaigns.map(normalizeCampaign);
 }
 
-export async function saveCampaignMetadata(campaign: CampaignMetadata): Promise<CampaignMetadata> {
+export async function saveCampaignMetadata(campaign: CampaignMetadata, auth: RequestAuthInput): Promise<CampaignMetadata> {
+  const signedAuth = await createSignedRequestAuth({
+    action: "campaigns:create",
+    address: auth.address,
+    payload: campaign,
+    walletClient: auth.walletClient,
+  });
   const response = await fetch(`${API_URL}/api/campaigns`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...toSignedHeaders(signedAuth),
     },
     body: JSON.stringify({
       chainCampaignId: campaign.chainCampaignId,
@@ -59,22 +78,34 @@ export async function saveCampaignMetadata(campaign: CampaignMetadata): Promise<
     }),
   });
 
-  if (!response.ok) throw new Error("Failed to save campaign.");
+  if (!response.ok) throw new Error(await readErrorMessage(response, "Failed to save campaign."));
   const savedCampaign = (await response.json()) as Record<string, unknown>;
   return normalizeCampaign(savedCampaign);
 }
 
-export async function askAdNodeAssistant(prompt: string, history: AssistantChatTurn[] = []): Promise<{ reply: string; model: string }> {
+export async function askAdNodeAssistant(
+  prompt: string,
+  history: AssistantChatTurn[] = [],
+  auth: RequestAuthInput,
+): Promise<{ reply: string; model: string }> {
+  const payload = { prompt, history };
+  const signedAuth = await createSignedRequestAuth({
+    action: "assistant:ask",
+    address: auth.address,
+    payload,
+    walletClient: auth.walletClient,
+  });
   const response = await fetch(`${API_URL}/api/assistant`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...toSignedHeaders(signedAuth),
     },
-    body: JSON.stringify({ prompt, history }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
-    throw new Error("Assistant request failed.");
+    throw new Error(await readErrorMessage(response, "Assistant request failed."));
   }
 
   return (await response.json()) as { reply: string; model: string };
@@ -99,28 +130,43 @@ export async function fetchSlots(): Promise<SlotMetadata[]> {
   return slots.map(normalizeSlot);
 }
 
-export async function saveSlot(slot: SlotMetadata): Promise<SlotMetadata> {
+export async function saveSlot(slot: SlotMetadata, auth: RequestAuthInput): Promise<SlotMetadata> {
+  const signedAuth = await createSignedRequestAuth({
+    action: "slots:create",
+    address: auth.address,
+    payload: slot,
+    walletClient: auth.walletClient,
+  });
   const response = await fetch(`${API_URL}/api/slots`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...toSignedHeaders(signedAuth),
     },
     body: JSON.stringify(slot),
   });
 
-  if (!response.ok) throw new Error("Failed to save slot.");
+  if (!response.ok) throw new Error(await readErrorMessage(response, "Failed to save slot."));
   return normalizeSlot((await response.json()) as Record<string, unknown>);
 }
 
-export async function updateSlotAssignment(chainSlotId: string, assignedCampaignId: string): Promise<SlotMetadata> {
+export async function updateSlotAssignment(chainSlotId: string, assignedCampaignId: string, auth: RequestAuthInput): Promise<SlotMetadata> {
+  const payload = { assignedCampaignId };
+  const signedAuth = await createSignedRequestAuth({
+    action: "slots:assign",
+    address: auth.address,
+    payload,
+    walletClient: auth.walletClient,
+  });
   const response = await fetch(`${API_URL}/api/slot?chainSlotId=${encodeURIComponent(chainSlotId)}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
+      ...toSignedHeaders(signedAuth),
     },
-    body: JSON.stringify({ assignedCampaignId }),
+    body: JSON.stringify(payload),
   });
 
-  if (!response.ok) throw new Error("Failed to update slot assignment.");
+  if (!response.ok) throw new Error(await readErrorMessage(response, "Failed to update slot assignment."));
   return normalizeSlot((await response.json()) as Record<string, unknown>);
 }

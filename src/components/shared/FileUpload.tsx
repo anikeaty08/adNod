@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
 import { uploadCreativeToIpfs } from "@/lib/ipfs";
+import { useWallet } from "@/context/WalletContext";
+import { useWalletClient } from "wagmi";
 
 export function FileUpload({
   onUploaded,
@@ -8,10 +10,17 @@ export function FileUpload({
 }) {
   const [status, setStatus] = useState("Upload an image or video and AdNode will pin it to IPFS automatically.");
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const { address, connected } = useWallet();
+  const { data: walletClient } = useWalletClient();
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    if (!connected || !address || !walletClient) {
+      setStatus("Connect your wallet before uploading a creative.");
+      return;
+    }
 
     if (!["image/", "video/"].some((prefix) => file.type.startsWith(prefix))) {
       setStatus("Only image and mp4/video files are supported.");
@@ -21,7 +30,10 @@ export function FileUpload({
     setStatus("Uploading to IPFS...");
 
     try {
-      const uri = await uploadCreativeToIpfs(file);
+      const uri = await uploadCreativeToIpfs(file, {
+        address,
+        walletClient,
+      });
       onUploaded?.(uri);
       setStatus(`Uploaded: ${uri}`);
     } catch (error) {

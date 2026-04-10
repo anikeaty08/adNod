@@ -49,7 +49,11 @@ export function CampaignForm() {
         title: values.title,
         description: values.description,
       });
-      setStatus(`Campaign ${result.campaignId} submitted on-chain. Tx: ${result.hash}`);
+      setStatus(
+        result.metadataSaved
+          ? `Campaign ${result.campaignId} submitted on-chain. Tx: ${result.hash}`
+          : `Campaign ${result.campaignId} is live on-chain, but metadata sync failed. Refresh and retry the profile details sync.`,
+      );
       form.reset(defaultCampaignForm);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Campaign creation failed.");
@@ -97,7 +101,7 @@ export function CampaignForm() {
         </label>
         <div className="grid gap-4 lg:grid-cols-3">
           <label className="space-y-2 text-sm">
-            <span>Budget (MAS)</span>
+            <span>Budget (ETH)</span>
             <input
               type="text"
               className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50"
@@ -113,7 +117,7 @@ export function CampaignForm() {
             </select>
           </label>
           <label className="space-y-2 text-sm">
-            <span>Rate (MAS)</span>
+            <span>Rate (whole CPC units)</span>
             <input
               type="number"
               step="0.1"

@@ -13,7 +13,6 @@ export function DeveloperDashboard() {
   const { data: campaigns = [] } = useCampaigns();
   const { data: slots = [] } = useSlots();
   const metrics = useCampaignMetrics(campaigns);
-  const slotMetrics = useSlotMetrics(slots);
   const { registerSlot, getMyEarnings, isConfigured, saveSlotMetadata, assignCampaignToSlot } = useAdNode();
   const { connected, address } = useWallet();
   const [siteName, setSiteName] = useState("");
@@ -39,6 +38,7 @@ export function DeveloperDashboard() {
     [campaigns, filterCategory, search],
   );
   const ownedSlots = address ? slots.filter((slot) => slot.developer.toLowerCase() === address.toLowerCase()) : [];
+  const slotMetrics = useSlotMetrics(ownedSlots);
   const earningsChartData = earnings && address ? [{ name: address, earnings: Number(earnings) }] : [];
   const developerMetrics = [
     {
@@ -82,14 +82,18 @@ export function DeveloperDashboard() {
     setStatus("Registering slot on-chain...");
     try {
       const result = await registerSlot(siteName, category);
-      await saveSlotMetadata({
-        chainSlotId: String(result.slotId),
-        siteName,
-        siteUrl,
-        category,
-        dailyTrafficEstimate,
-      });
-      setStatus(`Slot ${result.slotId} registered. Tx: ${result.hash}`);
+      try {
+        await saveSlotMetadata({
+          chainSlotId: String(result.slotId),
+          siteName,
+          siteUrl,
+          category,
+          dailyTrafficEstimate,
+        });
+        setStatus(`Slot ${result.slotId} registered. Tx: ${result.hash}`);
+      } catch {
+        setStatus(`Slot ${result.slotId} is live on-chain, but metadata sync failed. Retry slot details sync from this browser.`);
+      }
       setSiteName("");
       setSiteUrl("");
       setCategory("");

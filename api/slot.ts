@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import "dotenv/config";
 import { assignSlotCampaign } from "../server/slot-store.js";
+import { assertSignedRequest } from "../server/request-auth.js";
 
 async function readBody(req: IncomingMessage) {
   const chunks: Buffer[] = [];
@@ -30,8 +31,17 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   const url = getUrl(req);
   const chainSlotId = url.searchParams.get("chainSlotId") ?? "";
   const body = (await readBody(req)) as Record<string, unknown>;
+  const payload = { assignedCampaignId: String(body.assignedCampaignId ?? "") };
 
-  const updated = await assignSlotCampaign(chainSlotId, String(body.assignedCampaignId ?? ""));
+  try {
+    await assertSignedRequest(req.headers, "slots:assign", payload);
+  } catch (error) {
+    res.statusCode = 401;
+    res.end(JSON.stringify({ error: error instanceof Error ? error.message : "Unauthorized request." }));
+    return;
+  }
+
+  const updated = await assignSlotCampaign(chainSlotId, payload.assignedCampaignId);
 
   if (!updated) {
     res.statusCode = 404;

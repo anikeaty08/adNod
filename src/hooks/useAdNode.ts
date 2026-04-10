@@ -3,7 +3,7 @@ import { Encryptable, FheTypes } from "@cofhe/sdk";
 import { useAccount, useConnect, usePublicClient, useWalletClient, useWriteContract } from "wagmi";
 import { readContract } from "@wagmi/core";
 import { waitForTransactionReceipt } from "viem/actions";
-import { decodeEventLog, formatEther, parseAbiItem } from "viem";
+import { decodeEventLog, formatEther } from "viem";
 import {
   wagmiConfig,
   adRegistryAbiTyped,
@@ -15,6 +15,7 @@ import {
   getCofheClient,
 } from "@/lib/contract-client";
 import { saveCampaignMetadata, fetchCampaignMetadata, fetchSlots, saveSlot, updateSlotAssignment } from "@/lib/api";
+import { queryClient } from "@/lib/queryClient";
 
 export function useAdNode() {
   const { address, isConnected } = useAccount();
@@ -110,16 +111,32 @@ export function useAdNode() {
           throw new Error("Unable to decode CampaignCreated event.");
         }
 
-        await saveCampaignMetadata({
-          chainCampaignId: String(campaignId),
-          title: params.title,
-          description: params.description,
-          creativeURI: params.creativeURI,
-          category: params.category,
-          advertiser: address,
-        });
+        let metadataSaved = true;
+        try {
+          await saveCampaignMetadata(
+            {
+              chainCampaignId: String(campaignId),
+              title: params.title,
+              description: params.description,
+              creativeURI: params.creativeURI,
+              category: params.category,
+              advertiser: address,
+            },
+            {
+              address,
+              walletClient,
+            },
+          );
+        } catch {
+          metadataSaved = false;
+        }
 
-        return { hash, campaignId };
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["campaigns"] }),
+          queryClient.invalidateQueries({ queryKey: ["platform-stats"] }),
+        ]);
+
+        return { hash, campaignId, metadataSaved };
       },
       registerSlot: async (siteName: string, category: string) => {
         assertConfigured();
@@ -158,21 +175,34 @@ export function useAdNode() {
         category: string;
         dailyTrafficEstimate: string;
       }) => {
-        if (!address) throw new Error("Wallet is not connected.");
+        if (!address || !walletClient) throw new Error("Wallet is not connected.");
 
-        return saveSlot({
-          chainSlotId: params.chainSlotId,
-          siteName: params.siteName,
-          siteUrl: params.siteUrl,
-          category: params.category,
-          dailyTrafficEstimate: params.dailyTrafficEstimate,
-          developer: address,
-          assignedCampaignId: "",
-        });
+        const slot = await saveSlot(
+          {
+            chainSlotId: params.chainSlotId,
+            siteName: params.siteName,
+            siteUrl: params.siteUrl,
+            category: params.category,
+            dailyTrafficEstimate: params.dailyTrafficEstimate,
+            developer: address,
+            assignedCampaignId: "",
+          },
+          {
+            address,
+            walletClient,
+          },
+        );
+
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["slots"] }),
+          queryClient.invalidateQueries({ queryKey: ["platform-stats"] }),
+        ]);
+
+        return slot;
       },
       assignCampaignToSlot: async (slotId: number, campaignId: number) => {
         assertConfigured();
-        if (!walletClient) throw new Error("Wallet is not connected.");
+        if (!walletClient || !publicClient || !address) throw new Error("Wallet is not connected.");
 
         const hash = await writeContractAsync({
           address: adRegistryAddress,
@@ -183,7 +213,27 @@ export function useAdNode() {
           account: walletClient.account,
         });
 
-        await updateSlotAssignment(String(slotId), String(campaignId));
+        await waitForTransactionReceipt(publicClient, { hash });
+
+        try {
+          await updateSlotAssignment(
+            String(slotId),
+            String(campaignId),
+            {
+              address,
+              walletClient,
+            },
+          );
+        } catch {
+          // The chain remains the source of truth even if metadata sync fails.
+        }
+
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["slots"] }),
+          queryClient.invalidateQueries({ queryKey: ["campaigns"] }),
+          queryClient.invalidateQueries({ queryKey: ["platform-stats"] }),
+        ]);
+
         return hash;
       },
       recordImpression: async (campaignId: number) => {
@@ -288,9 +338,9 @@ export function useAdNode() {
       },
       setCampaignActive: async (campaignId: number, active: boolean) => {
         assertConfigured();
-        if (!walletClient) throw new Error("Wallet is not connected.");
+        if (!walletClient || !publicClient) throw new Error("Wallet is not connected.");
 
-        return writeContractAsync({
+        const hash = await writeContractAsync({
           address: adRegistryAddress,
           abi: adRegistryAbiTyped,
           functionName: "setCampaignActive",
@@ -298,13 +348,21 @@ export function useAdNode() {
           chain: walletClient.chain,
           account: walletClient.account,
         });
+
+        await waitForTransactionReceipt(publicClient, { hash });
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["campaigns"] }),
+          queryClient.invalidateQueries({ queryKey: ["platform-stats"] }),
+        ]);
+
+        return hash;
       },
       getPublicCampaigns: async () => {
         if (!isConfigured) {
           return [];
         }
 
-        const metadata = await fetchCampaignMetadata();
+        const metadata = await fetchCampaignMetadata().catch(() => []);
         const nextId = (await readContract(wagmiConfig, {
           address: adRegistryAddress,
           abi: adRegistryAbiTyped,
@@ -320,6 +378,12 @@ export function useAdNode() {
               functionName: "getPublicInfo",
               args: [BigInt(id)],
             })) as [string, string, boolean];
+            const advertiser = (await readContract(wagmiConfig, {
+              address: adRegistryAddress,
+              abi: adRegistryAbiTyped,
+              functionName: "campaignHoster",
+              args: [BigInt(id)],
+            })) as string;
             const metadataItem = metadata.find((item) => item.chainCampaignId === String(id));
 
             return {
@@ -330,16 +394,62 @@ export function useAdNode() {
               category,
               pricingModel: "CPC" as const,
               status: active ? ("active" as const) : ("paused" as const),
-              advertiser: metadataItem?.advertiser || "",
+              advertiser,
             };
           }),
         );
 
         return campaigns;
       },
+      getPublicSlots: async () => {
+        if (!isConfigured) {
+          return fetchSlots().catch(() => []);
+        }
+
+        const metadata = await fetchSlots().catch(() => []);
+        const nextSlotId = (await readContract(wagmiConfig, {
+          address: adRegistryAddress,
+          abi: adRegistryAbiTyped,
+          functionName: "nextSlotId",
+        })) as bigint;
+
+        const slots = await Promise.all(
+          Array.from({ length: Number(nextSlotId) - 1 }, async (_, index) => {
+            const id = index + 1;
+            const [developer, siteName, category, active, assignedCampaignId] = (await readContract(wagmiConfig, {
+              address: adRegistryAddress,
+              abi: adRegistryAbiTyped,
+              functionName: "slots",
+              args: [BigInt(id)],
+            })) as [string, string, string, boolean, bigint];
+            const metadataItem = metadata.find((item) => item.chainSlotId === String(id));
+
+            return {
+              chainSlotId: String(id),
+              siteName: metadataItem?.siteName || siteName,
+              siteUrl: metadataItem?.siteUrl || "",
+              category: metadataItem?.category || category,
+              dailyTrafficEstimate: metadataItem?.dailyTrafficEstimate || "",
+              developer,
+              assignedCampaignId: assignedCampaignId > 0n ? String(assignedCampaignId) : metadataItem?.assignedCampaignId || "",
+              active,
+            };
+          }),
+        );
+
+        return slots;
+      },
       getPlatformStats: async () => {
-        const metadata = await fetchCampaignMetadata();
-        const slots = await fetchSlots();
+        if (!isConfigured) {
+          const [metadata, slots] = await Promise.all([fetchCampaignMetadata().catch(() => []), fetchSlots().catch(() => [])]);
+          return {
+            totalCampaigns: metadata.length,
+            totalSlots: slots.length,
+            totalVerifiedTransactions: 0,
+          };
+        }
+
+        const [metadata, slots] = await Promise.all([fetchCampaignMetadata().catch(() => []), fetchSlots().catch(() => [])]);
         const nextCampaignId = (await readContract(wagmiConfig, {
           address: adRegistryAddress,
           abi: adRegistryAbiTyped,
@@ -352,9 +462,9 @@ export function useAdNode() {
         })) as bigint;
 
         return {
-          totalCampaigns: metadata.length || Number(nextCampaignId) - 1,
+          totalCampaigns: Math.max(metadata.length, Number(nextCampaignId) - 1),
           totalSlots: Math.max(slots.length, Number(nextSlotId) - 1),
-          totalVerifiedTransactions: 1,
+          totalVerifiedTransactions: Math.max(0, Number(nextCampaignId) - 1) + Math.max(0, Number(nextSlotId) - 1),
         };
       },
     }),

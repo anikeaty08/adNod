@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import "dotenv/config";
 import { getAssistantReply, type AssistantMessage } from "../server/assistant.js";
+import { assertSignedRequest } from "../server/request-auth.js";
 
 async function readBody(req: IncomingMessage) {
   const chunks: Buffer[] = [];
@@ -34,11 +35,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   }
 
   try {
+    await assertSignedRequest(req.headers, "assistant:ask", { prompt, history });
     const completion = await getAssistantReply(prompt, history);
     res.statusCode = 200;
     res.end(JSON.stringify(completion));
   } catch (error) {
-    res.statusCode = 502;
-    res.end(JSON.stringify({ error: error instanceof Error ? error.message : "Assistant request failed." }));
+    const message = error instanceof Error ? error.message : "Assistant request failed.";
+    res.statusCode =
+      message.toLowerCase().includes("authorization") || message.toLowerCase().includes("signature") || message.toLowerCase().includes("expired") ? 401 : 502;
+    res.end(JSON.stringify({ error: message }));
   }
 }

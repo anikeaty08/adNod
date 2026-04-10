@@ -85,7 +85,7 @@ export function CampaignCard({
       </div>
       <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
         <Wallet className="h-4 w-4 text-sky-500" />
-        {campaign.encryptedCpc ? `Decrypted CPC available` : "Financial data remains encrypted on-chain"}
+        {campaign.pricingModel === "CPC" ? "CPC pricing is stored encrypted on-chain." : "Financial data remains encrypted on-chain"}
       </div>
       {showControls ? (
         <div className="mt-6 flex flex-wrap gap-3">

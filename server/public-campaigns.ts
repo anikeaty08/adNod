@@ -2,6 +2,7 @@ import { createPublicClient, http } from "viem";
 import { defineChain } from "viem";
 import adRegistryAbi from "../src/lib/abi/AdRegistry.json" with { type: "json" };
 import { getCampaigns } from "./campaign-store.js";
+import { getSlots } from "./slot-store.js";
 
 const rpcUrl = process.env.VITE_FHENIX_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc";
 const chainId = Number(process.env.VITE_CHAIN_ID || 421614);
@@ -75,6 +76,12 @@ export async function getPublicCampaignById(campaignId: number) {
     functionName: "getPublicInfo",
     args: [BigInt(campaignId)],
   })) as [string, string, boolean];
+  const advertiser = (await publicClient.readContract({
+    address: adRegistryAddress,
+    abi: adRegistryAbi,
+    functionName: "campaignHoster",
+    args: [BigInt(campaignId)],
+  })) as string;
 
   const metadata = await getCampaigns();
   const metadataItem = metadata.find((item) => String((item as { chainCampaignId?: string }).chainCampaignId ?? "") === String(campaignId)) as
@@ -92,7 +99,7 @@ export async function getPublicCampaignById(campaignId: number) {
     id: String(campaignId),
     title: metadataItem?.title || `Campaign ${campaignId}`,
     description: metadataItem?.description || "AdNode campaign creative",
-    advertiser: metadataItem?.advertiser || "",
+    advertiser,
     creativeURI,
     assetUrl,
     assetKind,
@@ -101,10 +108,63 @@ export async function getPublicCampaignById(campaignId: number) {
   };
 }
 
-export function buildEmbedScript(origin: string, campaignId: number) {
-  const safeOrigin = JSON.stringify(origin);
+export async function getPublicSlotById(slotId: number) {
+  const [developer, siteName, category, active, assignedCampaignId] = (await publicClient.readContract({
+    address: adRegistryAddress,
+    abi: adRegistryAbi,
+    functionName: "slots",
+    args: [BigInt(slotId)],
+  })) as [string, string, string, boolean, bigint];
 
-  return `(function(){\n  var campaignId = ${JSON.stringify(String(campaignId))};\n  var origin = ${safeOrigin};\n  var selector = '[data-adnode-campaign=\"' + campaignId + '\"]';\n  var mount = document.querySelector(selector);\n  if (!mount) {\n    mount = document.createElement('div');\n    mount.setAttribute('data-adnode-campaign', campaignId);\n    document.currentScript && document.currentScript.parentNode && document.currentScript.parentNode.insertBefore(mount, document.currentScript);\n  }\n  mount.innerHTML = '';\n  var frame = document.createElement('iframe');\n  frame.src = origin + '/api/embed-frame?campaignId=' + encodeURIComponent(campaignId);\n  frame.loading = 'lazy';\n  frame.style.width = '100%';\n  frame.style.minHeight = '280px';\n  frame.style.border = '0';\n  frame.style.borderRadius = '20px';\n  frame.style.overflow = 'hidden';\n  frame.setAttribute('title', 'AdNode Campaign ' + campaignId);\n  mount.appendChild(frame);\n})();`;
+  const metadata = await getSlots();
+  const metadataItem = metadata.find((item) => String((item as { chainSlotId?: string }).chainSlotId ?? "") === String(slotId)) as
+    | {
+        siteName?: string;
+        siteUrl?: string;
+        dailyTrafficEstimate?: string;
+      }
+    | undefined;
+
+  return {
+    id: String(slotId),
+    developer,
+    siteName: metadataItem?.siteName || siteName,
+    siteUrl: metadataItem?.siteUrl || "",
+    dailyTrafficEstimate: metadataItem?.dailyTrafficEstimate || "",
+    category,
+    active,
+    assignedCampaignId: Number(assignedCampaignId),
+  };
+}
+
+export async function getPublicCampaignBySlotId(slotId: number) {
+  const slot = await getPublicSlotById(slotId);
+
+  if (!slot.active) {
+    throw new Error("Slot is inactive.");
+  }
+
+  if (!Number.isFinite(slot.assignedCampaignId) || slot.assignedCampaignId < 1) {
+    throw new Error("No campaign is assigned to this slot.");
+  }
+
+  return {
+    ...(await getPublicCampaignById(slot.assignedCampaignId)),
+    slotId: String(slotId),
+  };
+}
+
+export function buildEmbedScript(origin: string, options: { campaignId?: number; slotId?: number }) {
+  const safeOrigin = JSON.stringify(origin);
+  const slotId = options.slotId ? String(options.slotId) : null;
+  const campaignId = options.campaignId ? String(options.campaignId) : null;
+  const identifier = slotId ?? campaignId ?? "";
+  const selectorAttribute = slotId ? "data-adnode-slot" : "data-adnode-campaign";
+  const frameQuery = slotId
+    ? `slotId=' + encodeURIComponent(identifier)`
+    : `campaignId=' + encodeURIComponent(identifier)`;
+
+  return `(function(){\n  var identifier = ${JSON.stringify(identifier)};\n  var origin = ${safeOrigin};\n  var selector = '[${selectorAttribute}=\"' + identifier + '\"]';\n  var mount = document.querySelector(selector);\n  if (!mount) {\n    mount = document.createElement('div');\n    mount.setAttribute('${selectorAttribute}', identifier);\n    document.currentScript && document.currentScript.parentNode && document.currentScript.parentNode.insertBefore(mount, document.currentScript);\n  }\n  mount.innerHTML = '';\n  var frame = document.createElement('iframe');\n  frame.src = origin + '/api/embed?mode=frame&${frameQuery}';\n  frame.loading = 'lazy';\n  frame.style.width = '100%';\n  frame.style.minHeight = '280px';\n  frame.style.border = '0';\n  frame.style.borderRadius = '20px';\n  frame.style.overflow = 'hidden';\n  frame.setAttribute('title', 'AdNode Slot ' + identifier);\n  mount.appendChild(frame);\n})();`;
 }
 
 export function buildEmbedFrameHtml(campaign: Awaited<ReturnType<typeof getPublicCampaignById>>) {

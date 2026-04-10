@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, MessageSquare, Send, X } from "lucide-react";
+import { useWalletClient } from "wagmi";
 import { Button } from "@/components/shared/Button";
 import { askAdNodeAssistant, type AssistantChatTurn } from "@/lib/api";
+import { useWallet } from "@/context/WalletContext";
 
 const quickPrompts = ["What is AdNode?", "Who can see my campaign budget?", "How do publishers earn?"];
 
@@ -18,6 +20,8 @@ export function AiAssistantWidget() {
     },
   ]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const { connected, address } = useWallet();
+  const { data: walletClient } = useWalletClient();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -34,7 +38,14 @@ export function AiAssistantWidget() {
     setStatus("Thinking...");
 
     try {
-      const response = await askAdNodeAssistant(question, history);
+      if (!connected || !address || !walletClient) {
+        throw new Error("Connect your wallet before using the AdNode assistant.");
+      }
+
+      const response = await askAdNodeAssistant(question, history, {
+        address,
+        walletClient,
+      });
       setMessages((current) => [...current, { role: "assistant", content: response.reply }]);
       setModel(response.model);
       setStatus(response.model === "AdNode FAQ" ? "Answered from AdNode FAQ." : "Live response generated through Groq.");

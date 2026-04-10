@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ContractCampaign, SlotMetadata } from "@/lib/fhenix-contract";
 import { useAdNode } from "@/hooks/useAdNode";
-import { fetchSlots } from "@/lib/api";
 
 const campaignKey = ["campaigns"];
 
@@ -35,9 +34,11 @@ export function useCampaignMetrics(campaigns: ContractCampaign[]) {
 }
 
 export function useSlots() {
+  const { getPublicSlots } = useAdNode();
+
   return useQuery({
     queryKey: ["slots"],
-    queryFn: fetchSlots,
+    queryFn: getPublicSlots,
   });
 }
 

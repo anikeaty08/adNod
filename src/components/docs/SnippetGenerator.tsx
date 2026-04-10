@@ -1,21 +1,24 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/shared/Button";
-import { useCampaigns } from "@/hooks/useCampaigns";
+import { useSlots } from "@/hooks/useCampaigns";
+import { useWallet } from "@/context/WalletContext";
 
 type SnippetKey = "html" | "react" | "nextjs" | "vue" | "python" | "php";
 type SnippetMap = Record<SnippetKey, string>;
 
 export function SnippetGenerator() {
-  const { data: campaigns = [] } = useCampaigns();
+  const { data: slots = [] } = useSlots();
+  const { address } = useWallet();
   const [selected, setSelected] = useState<SnippetKey>("html");
-  const [campaignId, setCampaignId] = useState("");
-  const activeCampaignId = campaignId || campaigns[0]?.id || "1";
+  const [slotId, setSlotId] = useState("");
+  const ownedSlots = address ? slots.filter((slot) => slot.developer.toLowerCase() === address.toLowerCase()) : [];
+  const activeSlotId = slotId || ownedSlots[0]?.chainSlotId || "";
   const origin = typeof window !== "undefined" ? window.location.origin : "https://your-adnode-domain.com";
 
   const snippets = useMemo<SnippetMap>(
     () => ({
-      html: `<div data-adnode-campaign="${activeCampaignId}"></div>
-<script async src="${origin}/api/embed.js?campaignId=${activeCampaignId}"></script>`,
+      html: `<div data-adnode-slot="${activeSlotId || "YOUR_SLOT_ID"}"></div>
+<script async src="${origin}/api/embed.js?slotId=${activeSlotId || "YOUR_SLOT_ID"}"></script>`,
       react: `import { useEffect, useRef } from "react";
 
 export function AdNodeSlot() {
@@ -24,12 +27,12 @@ export function AdNodeSlot() {
   useEffect(() => {
     const script = document.createElement("script");
     script.async = true;
-    script.src = "${origin}/api/embed.js?campaignId=${activeCampaignId}";
+    script.src = "${origin}/api/embed.js?slotId=${activeSlotId || "YOUR_SLOT_ID"}";
     ref.current?.appendChild(script);
     return () => script.remove();
   }, []);
 
-  return <div ref={ref} data-adnode-campaign="${activeCampaignId}" />;
+  return <div ref={ref} data-adnode-slot="${activeSlotId || "YOUR_SLOT_ID"}" />;
 }`,
       nextjs: `"use client";
 import { useEffect, useRef } from "react";
@@ -40,15 +43,15 @@ export default function AdNodeSlot() {
   useEffect(() => {
     const script = document.createElement("script");
     script.async = true;
-    script.src = "${origin}/api/embed.js?campaignId=${activeCampaignId}";
+    script.src = "${origin}/api/embed.js?slotId=${activeSlotId || "YOUR_SLOT_ID"}";
     ref.current?.appendChild(script);
     return () => script.remove();
   }, []);
 
-  return <div ref={ref} data-adnode-campaign="${activeCampaignId}" />;
+  return <div ref={ref} data-adnode-slot="${activeSlotId || "YOUR_SLOT_ID"}" />;
 }`,
       vue: `<template>
-  <div ref="slot" data-adnode-campaign="${activeCampaignId}"></div>
+  <div ref="slot" data-adnode-slot="${activeSlotId || "YOUR_SLOT_ID"}"></div>
 </template>
 
 <script setup>
@@ -60,7 +63,7 @@ let script;
 onMounted(() => {
   script = document.createElement("script");
   script.async = true;
-  script.src = "${origin}/api/embed.js?campaignId=${activeCampaignId}";
+  script.src = "${origin}/api/embed.js?slotId=${activeSlotId || "YOUR_SLOT_ID"}";
   slot.value?.appendChild(script);
 });
 
@@ -68,15 +71,15 @@ onBeforeUnmount(() => script?.remove());
 </script>`,
       python: `# Server-rendered HTML example
 html = """
-<div data-adnode-campaign="${activeCampaignId}"></div>
-<script async src="${origin}/api/embed.js?campaignId=${activeCampaignId}"></script>
+<div data-adnode-slot="${activeSlotId || "YOUR_SLOT_ID"}"></div>
+<script async src="${origin}/api/embed.js?slotId=${activeSlotId || "YOUR_SLOT_ID"}"></script>
 """`,
       php: `<?php
-echo '<div data-adnode-campaign="${activeCampaignId}"></div>';
-echo '<script async src="${origin}/api/embed.js?campaignId=${activeCampaignId}"></script>';
+echo '<div data-adnode-slot="${activeSlotId || "YOUR_SLOT_ID"}"></div>';
+echo '<script async src="${origin}/api/embed.js?slotId=${activeSlotId || "YOUR_SLOT_ID"}"></script>';
 ?>`,
     }),
-    [activeCampaignId, origin],
+    [activeSlotId, origin],
   );
 
   const snippet = useMemo(() => snippets[selected], [selected, snippets]);
@@ -104,28 +107,28 @@ echo '<script async src="${origin}/api/embed.js?campaignId=${activeCampaignId}">
       </div>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         <label className="space-y-2 text-sm">
-          <span>Campaign</span>
-          <select className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50" value={activeCampaignId} onChange={(event) => setCampaignId(event.target.value)}>
-            {campaigns.length ? (
-              campaigns.map((campaign) => (
-                <option key={campaign.id} value={campaign.id}>
-                  {campaign.title} ({campaign.id})
+          <span>Slot</span>
+          <select className="w-full rounded-2xl border bg-white/80 px-4 py-3 dark:bg-slate-950/50" value={activeSlotId} onChange={(event) => setSlotId(event.target.value)}>
+            {ownedSlots.length ? (
+              ownedSlots.map((slot) => (
+                <option key={slot.chainSlotId} value={slot.chainSlotId}>
+                  {slot.siteName || `Slot ${slot.chainSlotId}`} ({slot.chainSlotId})
                 </option>
               ))
             ) : (
-              <option value="1">Campaign 1</option>
+              <option value="">Create a slot first</option>
             )}
           </select>
         </label>
         <div className="rounded-[24px] bg-white/70 px-5 py-4 text-sm text-muted-foreground dark:bg-white/5">
-          This snippet loads a real AdNode iframe from <span className="font-mono text-xs">{origin}</span> for campaign <span className="font-semibold">{activeCampaignId}</span>.
+          This snippet loads the assigned campaign for slot <span className="font-semibold">{activeSlotId || "YOUR_SLOT_ID"}</span> from <span className="font-mono text-xs">{origin}</span>.
         </div>
       </div>
       <pre className="mt-6 overflow-x-auto rounded-[28px] bg-slate-950 p-6 font-mono text-sm leading-6 text-sky-100">
         <code>{snippet}</code>
       </pre>
-      <p className="mt-4 text-sm text-muted-foreground">The embed uses AdNode&apos;s real public campaign endpoint and renders the creative inside a hosted iframe.</p>
-      <Button className="mt-5" onClick={() => void navigator.clipboard.writeText(snippet)}>
+      <p className="mt-4 text-sm text-muted-foreground">The embed now resolves the campaign through the slot assignment path instead of letting a publisher hardcode any campaign id.</p>
+      <Button className="mt-5" onClick={() => void navigator.clipboard.writeText(snippet)} disabled={!activeSlotId}>
         Copy snippet
       </Button>
     </div>

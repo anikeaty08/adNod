@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import "dotenv/config";
-import { buildEmbedFrameHtml, buildEmbedScript, getPublicCampaignById } from "../server/public-campaigns.js";
+import { buildEmbedFrameHtml, buildEmbedScript, getPublicCampaignById, getPublicCampaignBySlotId } from "../server/public-campaigns.js";
 
 function getUrl(req: IncomingMessage) {
   const host = req.headers.host || "localhost";
@@ -11,16 +11,19 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   const url = getUrl(req);
   const mode = url.searchParams.get("mode") || "script";
   const campaignId = Number(url.searchParams.get("campaignId"));
+  const slotId = Number(url.searchParams.get("slotId"));
+  const hasSlotId = Number.isFinite(slotId) && slotId > 0;
+  const hasCampaignId = Number.isFinite(campaignId) && campaignId > 0;
 
-  if (!Number.isFinite(campaignId) || campaignId < 1) {
+  if (!hasSlotId && !hasCampaignId) {
     res.statusCode = 400;
-    res.end(mode === "frame" ? "<p>AdNode campaignId is required.</p>" : "console.error('AdNode campaignId is required.');");
+    res.end(mode === "frame" ? "<p>AdNode slotId or campaignId is required.</p>" : "console.error('AdNode slotId or campaignId is required.');");
     return;
   }
 
   if (mode === "frame") {
     try {
-      const campaign = await getPublicCampaignById(campaignId);
+      const campaign = hasSlotId ? await getPublicCampaignBySlotId(slotId) : await getPublicCampaignById(campaignId);
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.statusCode = 200;
       res.end(buildEmbedFrameHtml(campaign));
@@ -35,5 +38,5 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   const origin = `${url.protocol}//${url.host}`;
   res.setHeader("Content-Type", "application/javascript; charset=utf-8");
   res.statusCode = 200;
-  res.end(buildEmbedScript(origin, campaignId).replace("/api/embed-frame?", "/api/embed?mode=frame&"));
+  res.end(buildEmbedScript(origin, hasSlotId ? { slotId } : { campaignId }));
 }
