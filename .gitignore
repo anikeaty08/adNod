@@ -1,5 +1,9 @@
 node_modules
 dist
+build
+.next
+.cache
+.npm-cache
 .env
 .hh-artifacts
 .hh-cache
