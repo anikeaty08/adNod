@@ -58,6 +58,20 @@ contract AdRegistry is Ownable, ReentrancyGuard {
     mapping(address => bool) public settlementManagers;
     IAdNodePayoutWrapper public immutable payoutWrapper;
 
+    /// @notice Machine approver for publisher access requests (slot-scoped).
+    address public accessApprover;
+
+    enum AccessStatus {
+        None,
+        Requested,
+        Approved,
+        Denied,
+        Revoked
+    }
+
+    /// @dev campaignId => slotId => status
+    mapping(uint256 => mapping(uint256 => AccessStatus)) public accessStatus;
+
     event CampaignCreated(uint256 indexed id, address indexed hoster, string creativeURI, string category, uint256 initialFunding);
     event CampaignFunded(uint256 indexed id, address indexed funder, uint256 amount, uint256 availableFunds);
     event CampaignFundsWithdrawn(uint256 indexed id, address indexed hoster, uint256 amount, uint256 availableFunds);
@@ -71,6 +85,11 @@ contract AdRegistry is Ownable, ReentrancyGuard {
     event PayoutRecipientUpdated(address indexed developer, address indexed recipient);
     event DeveloperEarningsClaimed(address indexed developer, address indexed recipient, address indexed caller, uint256 amount);
     event PayoutWrapperConfigured(address indexed payoutWrapper);
+    event AccessApproverUpdated(address indexed account);
+    event AccessRequested(uint256 indexed campaignId, uint256 indexed slotId, address indexed developer);
+    event AccessApproved(uint256 indexed campaignId, uint256 indexed slotId, address indexed developer);
+    event AccessDenied(uint256 indexed campaignId, uint256 indexed slotId, address indexed developer);
+    event AccessRevoked(uint256 indexed campaignId, uint256 indexed slotId, address indexed developer);
 
     constructor(address initialOwner, address payoutWrapperAddress) Ownable(initialOwner) {
         require(payoutWrapperAddress != address(0), "Invalid payout wrapper");
@@ -80,6 +99,11 @@ contract AdRegistry is Ownable, ReentrancyGuard {
 
     modifier onlySettlementManager() {
         require(settlementManagers[msg.sender] || msg.sender == owner(), "Not settlement manager");
+        _;
+    }
+
+    modifier onlyAccessApprover() {
+        require(msg.sender == accessApprover, "Not access approver");
         _;
     }
 
@@ -198,6 +222,69 @@ contract AdRegistry is Ownable, ReentrancyGuard {
         emit SlotRegistered(id, msg.sender, siteName, category);
     }
 
+    function setAccessApprover(address account) external onlyOwner {
+        accessApprover = account;
+        emit AccessApproverUpdated(account);
+    }
+
+    /// @notice Publisher requests access to run a specific campaign in a specific slot.
+    function requestAccess(uint256 campaignId, uint256 slotId) external {
+        Slot storage slot = slots[slotId];
+        Campaign storage campaign = campaigns[campaignId];
+
+        require(slot.developer == msg.sender, "Not slot owner");
+        require(slot.active, "Slot inactive");
+        require(campaign.hoster != address(0), "Campaign missing");
+
+        AccessStatus current = accessStatus[campaignId][slotId];
+        require(current != AccessStatus.Approved, "Already approved");
+        require(current != AccessStatus.Requested, "Already requested");
+        require(current != AccessStatus.Revoked, "Access revoked");
+
+        accessStatus[campaignId][slotId] = AccessStatus.Requested;
+        emit AccessRequested(campaignId, slotId, msg.sender);
+    }
+
+    /// @notice Machine approves a requested slot/campaign pairing.
+    function approveAccess(uint256 campaignId, uint256 slotId) external onlyAccessApprover {
+        Slot storage slot = slots[slotId];
+        require(slot.developer != address(0), "Slot missing");
+
+        AccessStatus current = accessStatus[campaignId][slotId];
+        require(current == AccessStatus.Requested || current == AccessStatus.Denied, "Not requestable");
+        require(current != AccessStatus.Revoked, "Access revoked");
+
+        accessStatus[campaignId][slotId] = AccessStatus.Approved;
+        emit AccessApproved(campaignId, slotId, slot.developer);
+    }
+
+    /// @notice Machine denies a requested slot/campaign pairing.
+    function denyAccess(uint256 campaignId, uint256 slotId) external onlyAccessApprover {
+        Slot storage slot = slots[slotId];
+        require(slot.developer != address(0), "Slot missing");
+
+        AccessStatus current = accessStatus[campaignId][slotId];
+        require(current == AccessStatus.Requested, "Not requested");
+
+        accessStatus[campaignId][slotId] = AccessStatus.Denied;
+        emit AccessDenied(campaignId, slotId, slot.developer);
+    }
+
+    /// @notice Hoster revokes access for a slot. This blocks future assignments only.
+    function revokeAccess(uint256 campaignId, uint256 slotId, bool revoked) external {
+        Campaign storage campaign = campaigns[campaignId];
+        Slot storage slot = slots[slotId];
+        require(campaign.hoster == msg.sender, "Not campaign owner");
+        require(slot.developer != address(0), "Slot missing");
+
+        if (revoked) {
+            accessStatus[campaignId][slotId] = AccessStatus.Revoked;
+            emit AccessRevoked(campaignId, slotId, slot.developer);
+        } else {
+            accessStatus[campaignId][slotId] = AccessStatus.None;
+        }
+    }
+
     function setSlotActive(uint256 slotId, bool active) external {
         Slot storage slot = slots[slotId];
         require(slot.developer == msg.sender, "Not slot owner");
@@ -213,10 +300,12 @@ contract AdRegistry is Ownable, ReentrancyGuard {
         require(slot.active, "Slot inactive");
         require(campaign.active, "Campaign inactive");
         require(campaign.hoster != address(0), "Campaign missing");
-        require(
-            keccak256(bytes(slot.category)) == keccak256(bytes(campaign.category)),
-            "Category mismatch"
-        );
+        require(campaign.availableFunds > 0, "Campaign out of funds");
+
+        // Access gate (optional): once a machine approver is configured, it must approve this exact slot for this campaign.
+        if (accessApprover != address(0)) {
+            require(accessStatus[campaignId][slotId] == AccessStatus.Approved, "Access not approved");
+        }
 
         slot.assignedCampaignId = campaignId;
         emit CampaignAssignedToSlot(slotId, campaignId);
