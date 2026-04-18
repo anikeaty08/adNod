@@ -60,7 +60,7 @@ export default function StudioCampaignDetailPage() {
     setErr("");
     void (async () => {
       try {
-        const doc = await getJson<CampaignRow>(`/api/campaigns/${encodeURIComponent(String(idNum))}`);
+        const doc = await getJson<CampaignRow>(`/api/campaign?id=${encodeURIComponent(String(idNum))}`);
         setRow(doc);
       } catch {
         setErr("This campaign is still indexing. Refresh in a moment.");

@@ -141,7 +141,7 @@ export function AdvertiserPanel() {
       await overlay.withLoading(async () => {
         const meta = { filename: file.name, size: file.size, type: file.type || "application/octet-stream" };
         const { uri } = await signedPostMultipart(
-          "/api/uploads/creative",
+          "/api/upload-creative",
           "uploads:creative",
           meta,
           file,
@@ -271,7 +271,7 @@ export function AdvertiserPanel() {
 
       // Auto-save to API immediately (no manual sync step).
       try {
-        await postJson("/api/campaigns/auto", {
+        await postJson("/api/campaigns-auto", {
           chainCampaignId: createdId,
           txHash: hash,
           title,
@@ -322,7 +322,7 @@ export function AdvertiserPanel() {
       const row = loadPendingCampaignSync().find((p) => p.chainCampaignId === id);
       if (!row) throw new Error("No pending sync found for that id.");
       await overlay.withLoading(async () => {
-        await postJson("/api/campaigns/auto", {
+        await postJson("/api/campaigns-auto", {
           chainCampaignId: row.chainCampaignId,
           txHash: row.txHash,
           title: row.title ?? "",

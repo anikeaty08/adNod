@@ -24,7 +24,8 @@ function getUrl(req: IncomingMessage) {
 function getPathname(req: IncomingMessage) {
   const url = getUrl(req);
   const p = url.pathname || "/";
-  return p.startsWith("/api/") ? p.slice("/api".length) : p;
+  const stripped = p.startsWith("/api/") ? p.slice("/api".length) : p;
+  return stripped.length > 1 ? stripped.replace(/\/+$/, "") : stripped;
 }
 
 function sendJson(res: ServerResponse, status: number, payload: unknown) {
@@ -199,6 +200,14 @@ async function handleCampaignById(req: IncomingMessage, res: ServerResponse, cha
   } catch (error) {
     return sendJson(res, 500, { error: error instanceof Error ? error.message : "Failed to load campaign." });
   }
+}
+
+async function handleCampaign(req: IncomingMessage, res: ServerResponse) {
+  if (req.method !== "GET") return methodNotAllowed(res, "GET");
+  const url = getUrl(req);
+  const chainCampaignId = String(url.searchParams.get("id") ?? url.searchParams.get("chainCampaignId") ?? "").trim();
+  if (!/^\d+$/.test(chainCampaignId)) return sendJson(res, 400, { error: "id is required." });
+  return handleCampaignById(req, res, chainCampaignId);
 }
 
 async function handleCampaignAutoSync(req: IncomingMessage, res: ServerResponse) {
@@ -652,18 +661,18 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   try {
     if (p === "/health") return await handleHealth(req, res);
-    if (p === "/campaigns/auto") return await handleCampaignAutoSync(req, res);
+    if (p === "/campaigns-auto") return await handleCampaignAutoSync(req, res);
     if (p === "/campaigns") return await handleCampaigns(req, res);
-    if (p.startsWith("/campaigns/")) return await handleCampaignById(req, res, decodeURIComponent(p.slice("/campaigns/".length)));
-    if (p === "/slots/auto") return await handleSlotAutoSync(req, res);
+    if (p === "/campaign") return await handleCampaign(req, res);
+    if (p === "/slots-auto") return await handleSlotAutoSync(req, res);
     if (p === "/slots") return await handleSlots(req, res);
     if (p === "/slot") return await handleSlotPatch(req, res);
     if (p === "/public-campaign") return await handlePublicCampaign(req, res);
     if (p === "/embed") return await handleEmbed(req, res);
     if (p === "/measure") return await handleMeasure(req, res);
-    if (p === "/uploads/creative") return await handleUploadCreative(req, res);
-    if (p === "/settlement/replay") return await handleSettlementReplay(req, res);
-    if (p === "/assistant/chat") return await handleAssistantChat(req, res);
+    if (p === "/upload-creative") return await handleUploadCreative(req, res);
+    if (p === "/settlement-replay") return await handleSettlementReplay(req, res);
+    if (p === "/assistant-chat") return await handleAssistantChat(req, res);
     if (p === "/assistant") return await handleAssistant(req, res);
 
     return sendJson(res, 404, { error: "Not found" });

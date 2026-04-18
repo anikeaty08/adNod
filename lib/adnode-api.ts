@@ -70,10 +70,10 @@ export async function getJson<T>(path: string): Promise<T> {
   return JSON.parse(text || "null") as T;
 }
 
-/** Public help chat — same-origin `/api/assistant/chat` (Next route) so it works without pointing the UI at :4000. */
+/** Public help chat â€” same-origin `/api/assistant-chat` so it works without pointing the UI at :4000. */
 export async function postAssistantChat<T>(body: { prompt: string; history: Array<{ role: string; content: string }> }): Promise<T> {
   const base = getApiBase();
-  const url = base ? `${base}/api/assistant/chat` : "/api/assistant/chat";
+  const url = base ? `${base}/api/assistant-chat` : "/api/assistant-chat";
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

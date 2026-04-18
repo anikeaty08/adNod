@@ -23,9 +23,9 @@ const sections: { id: string; title: string; blocks: Block[] }[] = [
       {
         type: "ul",
         items: [
-          "Studio — create campaigns, sync metadata, track listings.",
-          "Publisher — register slots, assign campaigns, copy embed snippets.",
-          "Account — charts, claimable balance, withdraw when aligned to the payout wrapper step.",
+          "Studio â€” create campaigns, sync metadata, track listings.",
+          "Publisher â€” register slots, assign campaigns, copy embed snippets.",
+          "Account â€” charts, claimable balance, withdraw when aligned to the payout wrapper step.",
           "This page is a single-scroll handbook with copy-paste examples; use Prev / Next at the bottom to move between chapters.",
         ],
       },
@@ -44,13 +44,13 @@ const sections: { id: string; title: string; blocks: Block[] }[] = [
         items: [
           "Run the AdNode API locally or deploy it; CORS allows your frontend origin.",
           "Use the Publisher page for guided txs, or reproduce the same calls from your own scripts (below).",
-          "Category strings are case-sensitive on-chain semantics — match campaigns exactly.",
+          "Category strings are case-sensitive on-chain semantics â€” match campaigns exactly.",
         ],
       },
       {
         type: "code",
         title: "Read public metadata (no signature)",
-        code: `// Browser or Node — same origin as NEXT_PUBLIC_API_URL
+        code: `// Browser or Node â€” same origin as NEXT_PUBLIC_API_URL
 const base = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4000";
 
 const campaigns = await fetch(base + "/api/campaigns").then((r) => r.json());
@@ -66,7 +66,7 @@ console.log(campaigns, slots);`,
     blocks: [
       {
         type: "p",
-        text: "Publishers call AdRegistry: registerSlot(siteName, category) then assignCampaignToSlot(slotId, campaignId). The UI uses wagmi/viem; here is the same shape you would use in a script with viem’s walletClient.writeContract.",
+        text: "Publishers call AdRegistry: registerSlot(siteName, category) then assignCampaignToSlot(slotId, campaignId). The UI uses wagmi/viem; here is the same shape you would use in a script with viemâ€™s walletClient.writeContract.",
       },
       {
         type: "code",
@@ -107,7 +107,7 @@ await walletClient.writeContract({
     blocks: [
       {
         type: "p",
-        text: "The hosted iframe loads from your AdNode deployment’s origin. Replace YOUR_ORIGIN with that origin (e.g. https://app.example.com) and SLOT_ID with your on-chain slot id. The Publisher panel generates these snippets for you — this section mirrors that output.",
+        text: "The hosted iframe loads from your AdNode deploymentâ€™s origin. Replace YOUR_ORIGIN with that origin (e.g. https://app.example.com) and SLOT_ID with your on-chain slot id. The Publisher panel generates these snippets for you â€” this section mirrors that output.",
       },
       {
         type: "code",
@@ -230,7 +230,7 @@ await fetch(apiBase + "/api/slots", {
       {
         type: "ul",
         items: [
-          "You only successfully withdraw when claimable is at least one full step and is a whole multiple of that step — the Account page shows raw wei, step, remainder, and simulates the claim when possible.",
+          "You only successfully withdraw when claimable is at least one full step and is a whole multiple of that step â€” the Account page shows raw wei, step, remainder, and simulates the claim when possible.",
           "If the UI math looks right but the RPC still errors, try a different RPC endpoint; some gateways surface FHE reverts as generic JSON-RPC errors.",
           "Successful claims can be logged locally for charts (device-only history).",
         ],
@@ -246,7 +246,7 @@ await fetch(apiBase + "/api/slots", {
       },
       {
         type: "p",
-        text: "There is no separate “invoice API” for earnings — trust the on-chain claimable read plus your transaction history. Use Account charts to sanity-check spend across slots and campaigns you host or publish.",
+        text: "There is no separate â€œinvoice APIâ€ for earnings â€” trust the on-chain claimable read plus your transaction history. Use Account charts to sanity-check spend across slots and campaigns you host or publish.",
       },
     ],
   },
@@ -258,10 +258,10 @@ await fetch(apiBase + "/api/slots", {
       {
         type: "ul",
         items: [
-          "Creative — ipfs:// or https:// URI.",
-          "Category — must match publisher slots you want to fill.",
-          "Rate string — must match parseEther(rate) used as settlementRateWei on-chain.",
-          "Initial fund — optional ETH sent with the create tx.",
+          "Creative â€” ipfs:// or https:// URI.",
+          "Category â€” must match publisher slots you want to fill.",
+          "Rate string â€” must match parseEther(rate) used as settlementRateWei on-chain.",
+          "Initial fund â€” optional ETH sent with the create tx.",
         ],
       },
     ],
@@ -272,14 +272,14 @@ await fetch(apiBase + "/api/slots", {
     blocks: [
       {
         type: "p",
-        text: "The floating help widget calls POST /api/assistant/chat with no wallet signature (rate-limited). Configure Groq on the server for natural-language answers about this flow.",
+        text: "The floating help widget calls POST /api/assistant-chat with no wallet signature (rate-limited). Configure Groq on the server for natural-language answers about this flow.",
       },
       {
         type: "ul",
         items: [
-          "Hoster — wallet that owns the campaign on-chain.",
-          "Developer / publisher — wallet that owns slots and receives claimable earnings.",
-          "tFHE — UI label for confidential-side balances; enforcement still uses public wei rules for rates and steps.",
+          "Hoster â€” wallet that owns the campaign on-chain.",
+          "Developer / publisher â€” wallet that owns slots and receives claimable earnings.",
+          "tFHE â€” UI label for confidential-side balances; enforcement still uses public wei rules for rates and steps.",
         ],
       },
     ],
@@ -362,10 +362,10 @@ export function DocsGitbook() {
             ))}
           </nav>
           <Link href="/app/publisher" className="mt-8 inline-block text-sm text-accent hover:underline">
-            Open Publisher →
+            Open Publisher â†’
           </Link>
           <Link href="/app/studio/create" className="mt-2 block cursor-pointer text-sm text-accent hover:underline">
-            Open Studio →
+            Open Studio â†’
           </Link>
         </aside>
 
@@ -411,7 +411,7 @@ export function DocsGitbook() {
             <ChevronLeft size={18} /> Previous
           </button>
           <p className="hidden text-center text-xs text-muted sm:block">
-            {active + 1} / {sections.length} · {sections[active]?.title}
+            {active + 1} / {sections.length} Â· {sections[active]?.title}
           </p>
           <button
             type="button"

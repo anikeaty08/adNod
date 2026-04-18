@@ -130,7 +130,7 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
       }
 
       // Auto-index to the API (creates a slotKey for embeds; does not require a signature).
-      await postJson("/api/slots/auto", {
+      await postJson("/api/slots-auto", {
         chainSlotId,
         txHash,
         siteUrl,

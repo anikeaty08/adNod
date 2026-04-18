@@ -77,15 +77,14 @@ a {
     line-height: 1em;
     overflow: hidden;
     perspective: 900px;
-  }
-
-  .nav-flip-inner {
-    display: block;
-    position: relative;
     transform-style: preserve-3d;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
-  .nav-flip-layer {
+  .nav-flip::before,
+  .nav-flip::after {
+    content: attr(data-text);
     display: block;
     transform-style: preserve-3d;
     transition:
@@ -94,12 +93,12 @@ a {
     will-change: transform, opacity;
   }
 
-  .nav-flip-front {
+  .nav-flip::before {
     transform-origin: 50% 0%;
     transform: translateY(0%) rotateX(0deg);
   }
 
-  .nav-flip-back {
+  .nav-flip::after {
     position: absolute;
     left: 0;
     top: 0;
@@ -109,26 +108,25 @@ a {
     opacity: 0;
   }
 
-  .group:hover .nav-flip-front {
+  .group:hover .nav-flip::before {
     transform: translateY(-100%) rotateX(90deg);
     opacity: 0;
   }
 
-  .group:hover .nav-flip-back {
+  .group:hover .nav-flip::after {
     transform: translateY(0%) rotateX(0deg);
     opacity: 1;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .nav-flip-layer {
+    .nav-flip::before,
+    .nav-flip::after {
       transition: none;
     }
-    .nav-flip-back {
-      position: static;
-      transform: none;
-      opacity: 1;
+    .nav-flip::after {
+      display: none;
     }
-    .group:hover .nav-flip-front {
+    .group:hover .nav-flip::before {
       transform: none;
       opacity: 1;
     }
