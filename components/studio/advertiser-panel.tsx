@@ -255,7 +255,21 @@ export function AdvertiserPanel() {
           ...feeOverrides,
         });
       } catch (writeErr) {
-        throw new Error(formatCreateCampaignError(writeErr));
+        const msg = writeErr instanceof Error ? writeErr.message : String(writeErr);
+        if (msg.toLowerCase().includes("max fee per gas less than block base fee")) {
+          const retryOverrides = await estimateFeeOverrides(publicClient);
+          hash = await walletClient.writeContract({
+            address: CONTRACTS.registry,
+            abi: registryAbi,
+            functionName: "createCampaign",
+            args: [creativeUri, category, budgetIn, cpcIn, model, settlementRateWei],
+            value: fundValue,
+            gas,
+            ...retryOverrides,
+          });
+        } else {
+          throw new Error(formatCreateCampaignError(writeErr));
+        }
       }
       await waitForTransactionReceipt(publicClient, { hash });
       const next = (await publicClient.readContract({

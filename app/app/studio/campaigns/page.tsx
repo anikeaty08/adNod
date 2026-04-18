@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAccount } from "wagmi";
 import { Filter, Search } from "lucide-react";
 import { getJson } from "@/lib/adnode-api";
+import { useHydrated } from "@/lib/use-hydrated";
 import { GlassPanel } from "@/components/ui/glass-panel";
 import { Field, TextInput, Select } from "@/components/ui/field";
 
@@ -37,6 +38,7 @@ function parseRateEther(row: CampaignRow): number {
 
 export default function StudioCampaignsPage() {
   const { address } = useAccount();
+  const hydrated = useHydrated();
   const [rows, setRows] = useState<CampaignRow[]>([]);
   const [loadErr, setLoadErr] = useState("");
 
@@ -202,7 +204,7 @@ export default function StudioCampaignsPage() {
                     </p>
                   </div>
                   <div className="text-right text-xs text-muted">
-                    {r.createdAt ? <span>{new Date(r.createdAt).toLocaleString()}</span> : <span>—</span>}
+                    <span suppressHydrationWarning>{hydrated && r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}</span>
                   </div>
                 </div>
               </Link>

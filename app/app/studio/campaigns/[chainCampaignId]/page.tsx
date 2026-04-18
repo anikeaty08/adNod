@@ -21,6 +21,7 @@ import {
   YAxis,
 } from "recharts";
 import { getJson } from "@/lib/adnode-api";
+import { useHydrated } from "@/lib/use-hydrated";
 import { GlassPanel } from "@/components/ui/glass-panel";
 import { CONTRACTS, CONTRACTS_CONFIGURED, adRegistryAbi } from "@/lib/contracts";
 
@@ -41,6 +42,7 @@ export default function StudioCampaignDetailPage() {
   const idNum = Number(rawId);
   const idOk = Number.isFinite(idNum) && idNum >= 1;
   const { address } = useAccount();
+  const hydrated = useHydrated();
 
   const [row, setRow] = useState<CampaignRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -134,6 +136,7 @@ export default function StudioCampaignDetailPage() {
   }, [funding]);
 
   const timelineArea = useMemo(() => {
+    if (!hydrated) return [];
     if (!funding) return [];
     const settled = Number(formatEther(funding[2]));
     const created = row?.createdAt ? new Date(String(row.createdAt)).getTime() : null;
@@ -143,7 +146,7 @@ export default function StudioCampaignDetailPage() {
       { label: "Start", t: t0, settled: 0 },
       { label: "Now", t: t1, settled },
     ];
-  }, [funding, row?.createdAt]);
+  }, [funding, row?.createdAt, hydrated]);
 
   if (loading) {
     return <p className="text-sm text-muted">Loading…</p>;
@@ -223,7 +226,11 @@ export default function StudioCampaignDetailPage() {
                 <p className="text-xs font-semibold uppercase text-muted">Description</p>
                 <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted">{String(row.description ?? "")}</p>
               </div>
-              {row.createdAt ? <p className="text-xs text-muted">Synced {new Date(String(row.createdAt)).toLocaleString()}</p> : null}
+              {row.createdAt ? (
+                <p className="text-xs text-muted" suppressHydrationWarning>
+                  Synced {hydrated ? new Date(String(row.createdAt)).toLocaleString() : "—"}
+                </p>
+              ) : null}
             </>
           ) : (
             <p className="text-sm text-muted">

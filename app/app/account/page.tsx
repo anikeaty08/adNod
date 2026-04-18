@@ -29,6 +29,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useHydrated } from "@/lib/use-hydrated";
 import { CONTRACTS, CONTRACTS_CONFIGURED, adRegistryAbi, payoutWrapperAbi } from "@/lib/contracts";
 import { ScrambleNumber } from "@/components/ui/scramble-number";
 import { appendTxLog, readTxLog, type TxLogEntry } from "@/lib/tx-log";
@@ -96,6 +97,7 @@ type DevSlot = {
 };
 
 export default function AccountPage() {
+  const hydrated = useHydrated();
   const { address } = useAccount();
   const overlay = useOverlay();
   const claimAmountWeiRef = useRef<bigint>(0n);
@@ -402,6 +404,7 @@ export default function AccountPage() {
   );
 
   const monthlyWithdrawals = useMemo(() => {
+    if (!hydrated) return [];
     const now = new Date();
     const rows: { key: string; label: string; eth: number }[] = [];
     for (let i = 11; i >= 0; i--) {
@@ -421,7 +424,7 @@ export default function AccountPage() {
       if (row) row.eth += Number.parseFloat(t.amountEth) || 0;
     }
     return rows;
-  }, [txLog]);
+  }, [txLog, hydrated]);
 
   const monthlyWithdrawalsCumulative = useMemo(() => {
     let cumulative = 0;
