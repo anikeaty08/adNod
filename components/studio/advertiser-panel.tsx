@@ -9,6 +9,7 @@ import { CONTRACTS, CONTRACTS_CONFIGURED, adRegistryAbi } from "@/lib/contracts"
 import { ADNODE_CHAIN_ID } from "@/lib/chain";
 import { getJson, signedPostJson, signedPostMultipart } from "@/lib/adnode-api";
 import { estimateFeeOverrides } from "@/lib/fees";
+import { clearPendingCampaignSync, loadPendingCampaignSync, savePendingCampaignSync } from "@/lib/pending-campaign-sync";
 import { GlassPanel } from "@/components/ui/glass-panel";
 import { PrimaryButton } from "@/components/ui/primary-button";
 import { Field, TextInput, TextArea, Select } from "@/components/ui/field";
@@ -145,7 +146,7 @@ export function AdvertiserPanel() {
   const [initialFundEth, setInitialFundEth] = useState(SAMPLE_CAMPAIGN.initialFundEth);
   const [busy, setBusy] = useState("");
   const [newCampaignId, setNewCampaignId] = useState<string | null>(null);
-  const [existingCampaignId, setExistingCampaignId] = useState("");
+  const [pending, setPending] = useState<ReturnType<typeof loadPendingCampaignSync>>([]);
 
   const uploadCreative = useCallback(
     async (file: File) => {
@@ -299,8 +300,23 @@ export function AdvertiserPanel() {
           signMessageAsync,
           address,
         );
+        clearPendingCampaignSync(createdId);
       } catch (e) {
-        setBusy(`Campaign created on-chain (#${createdId}) but API sync failed: ${e instanceof Error ? e.message : "Sync failed"}`);
+        savePendingCampaignSync({
+          chainCampaignId: createdId,
+          title,
+          description,
+          creativeURI: creativeUri,
+          category,
+          pricingModel,
+          rate,
+          advertiser: address,
+        });
+        setPending(loadPendingCampaignSync());
+        setBusy(
+          `Campaign created on-chain (#${createdId}) but API sync failed: ${e instanceof Error ? e.message : "Sync failed"}. ` +
+            "Reloading usually fixes it; otherwise click Retry sync below.",
+        );
       }
     });
   }, [
@@ -321,6 +337,10 @@ export function AdvertiserPanel() {
     signMessageAsync,
   ]);
 
+  useEffect(() => {
+    setPending(loadPendingCampaignSync());
+  }, []);
+
   const syncMetadata = useCallback(async () => {
     if (!address || !newCampaignId) return;
     await overlay.withLoading(async () => {
@@ -340,33 +360,40 @@ export function AdvertiserPanel() {
         signMessageAsync,
         address,
       );
+      clearPendingCampaignSync(newCampaignId);
+      setPending(loadPendingCampaignSync());
     });
   }, [address, newCampaignId, title, description, creativeUri, category, pricingModel, rate, overlay, signMessageAsync]);
 
-  const syncExisting = useCallback(async () => {
-    if (!address) throw new Error("Connect wallet first.");
-    const id = existingCampaignId.trim();
-    if (!id) throw new Error("Enter an existing campaign id.");
-    await overlay.withLoading(async () => {
-      await signedPostJson(
-        "/api/campaigns",
-        "campaigns:create",
-        {
-          chainCampaignId: id,
-          title,
-          description,
-          creativeURI: creativeUri,
-          category,
-          pricingModel,
-          rate,
-          advertiser: address,
-        },
-        signMessageAsync,
-        address,
-      );
-      setBusy(`Synced campaign #${id} to API.`);
-    });
-  }, [address, existingCampaignId, title, description, creativeUri, category, pricingModel, rate, overlay, signMessageAsync]);
+  const retryPending = useCallback(
+    async (id: string) => {
+      if (!address) throw new Error("Connect wallet first.");
+      const row = loadPendingCampaignSync().find((p) => p.chainCampaignId === id);
+      if (!row) throw new Error("No pending sync found for that id.");
+      await overlay.withLoading(async () => {
+        await signedPostJson(
+          "/api/campaigns",
+          "campaigns:create",
+          {
+            chainCampaignId: row.chainCampaignId,
+            title: row.title,
+            description: row.description,
+            creativeURI: row.creativeURI,
+            category: row.category,
+            pricingModel: row.pricingModel,
+            rate: row.rate,
+            advertiser: address,
+          },
+          signMessageAsync,
+          address,
+        );
+        clearPendingCampaignSync(id);
+        setPending(loadPendingCampaignSync());
+        setBusy(`Synced campaign #${id} to API.`);
+      });
+    },
+    [address, overlay, signMessageAsync],
+  );
 
   if (!CONTRACTS_CONFIGURED) {
     return (
@@ -487,17 +514,30 @@ export function AdvertiserPanel() {
         </GlassPanel>
       ) : null}
 
-      <GlassPanel className="p-5 md:p-6">
-        <p className="text-sm text-muted">Already created on-chain? Sync any campaign id to the API:</p>
-        <div className="mt-3 flex flex-wrap items-end gap-3">
-          <Field label="Existing campaign id">
-            <TextInput value={existingCampaignId} onChange={(e) => setExistingCampaignId(e.target.value)} placeholder="2" />
-          </Field>
-          <PrimaryButton disabled={!!busy || !address || !existingCampaignId.trim()} onClick={() => void syncExisting().catch((e) => setBusy(e instanceof Error ? e.message : "Sync failed"))}>
-            Sync existing id
-          </PrimaryButton>
-        </div>
-      </GlassPanel>
+      {pending.length ? (
+        <GlassPanel className="p-5 md:p-6">
+          <p className="text-sm text-muted">Pending API sync</p>
+          <ul className="mt-3 space-y-2">
+            {pending.map((p) => (
+              <li key={p.chainCampaignId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-[color-mix(in_srgb,var(--surface-solid)_95%,transparent)] px-3 py-2">
+                <span className="text-sm text-muted">
+                  Campaign <span className="font-mono text-[var(--text)]">#{p.chainCampaignId}</span> · {p.category}
+                </span>
+                <PrimaryButton
+                  variant="ghost"
+                  disabled={!!busy || !address}
+                  onClick={() => void retryPending(p.chainCampaignId).catch((e) => setBusy(e instanceof Error ? e.message : "Sync failed"))}
+                >
+                  Retry sync
+                </PrimaryButton>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-muted">
+            This happens if the signature prompt was canceled or the request briefly failed. Retrying does not create a new on-chain campaign.
+          </p>
+        </GlassPanel>
+      ) : null}
     </div>
   );
 }
