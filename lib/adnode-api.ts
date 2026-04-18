@@ -1,7 +1,11 @@
 import { buildAdnodeAuthMessage, adnodeAuthHeaders } from "./adnode-auth";
 
 const DEFAULT_API_BASE = typeof window === "undefined" ? "http://127.0.0.1:4000" : "";
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || DEFAULT_API_BASE;
+const RAW_API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || DEFAULT_API_BASE;
+const API_BASE =
+  typeof window !== "undefined" && (RAW_API_BASE.includes("127.0.0.1:") || RAW_API_BASE.includes("localhost:"))
+    ? ""
+    : RAW_API_BASE;
 
 export function getApiBase() {
   return API_BASE ? API_BASE.replace(/\/$/, "") : "";
