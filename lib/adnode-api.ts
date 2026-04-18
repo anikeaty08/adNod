@@ -41,6 +41,28 @@ export async function signedPostJson<T>(
   return data as T;
 }
 
+export async function postJson<T>(path: string, payload: Record<string, unknown>): Promise<T> {
+  const base = getApiBase();
+  const url = base ? `${base}${path}` : path;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const text = await res.text();
+  let data: unknown = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { raw: text };
+  }
+  if (!res.ok) {
+    const err = (data as { error?: string }).error || text || res.statusText;
+    throw new Error(typeof err === "string" ? err : "API request failed");
+  }
+  return data as T;
+}
+
 export async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${getApiBase()}${path}`);
   const text = await res.text();
@@ -50,10 +72,8 @@ export async function getJson<T>(path: string): Promise<T> {
 
 /** Public help chat — same-origin `/api/assistant/chat` (Next route) so it works without pointing the UI at :4000. */
 export async function postAssistantChat<T>(body: { prompt: string; history: Array<{ role: string; content: string }> }): Promise<T> {
-  const url =
-    typeof window !== "undefined"
-      ? "/api/assistant/chat"
-      : `${getApiBase()}/api/assistant/chat`;
+  const base = getApiBase();
+  const url = base ? `${base}/api/assistant/chat` : "/api/assistant/chat";
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

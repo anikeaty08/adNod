@@ -9,18 +9,25 @@ import { BookOpen, Clapperboard, Home, LayoutGrid, LayoutTemplate, PlusCircle, W
 import { ADNODE_CHAIN_ID, adnodeChain } from "@/lib/chain";
 import { ThemeSwitcher } from "./theme-switcher";
 import { AdNodeLogo } from "@/components/brand/adnode-logo";
+import { HoverFlipText } from "@/components/ui/hover-flip-text";
 
 const studioLinks: readonly { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/", label: "Home", icon: Home },
+  { href: "/app/studio", label: "Studio", icon: Clapperboard },
   { href: "/app/studio/create", label: "New campaign", icon: PlusCircle },
   { href: "/app/studio/campaigns", label: "Your campaigns", icon: LayoutGrid },
+] as const;
+
+const publisherStudioLinks: readonly { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/app/studio/publisher", label: "Home", icon: Home },
+  { href: "/app/studio/publisher/slots", label: "Publisher slot", icon: LayoutTemplate },
+  { href: "/app/studio/publisher/embeds", label: "Embeds", icon: LayoutGrid },
 ] as const;
 
 /** Shown on marketing home, docs, and /app routes outside Studio — order: Home → Studio → Publisher → Account → Docs. */
 const browseLinks: readonly { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/app/studio/create", label: "Studio", icon: Clapperboard },
-  { href: "/app/publisher", label: "Publisher", icon: LayoutTemplate },
+  { href: "/app/studio", label: "Studio", icon: Clapperboard },
+  { href: "/app/studio/publisher", label: "Publisher", icon: LayoutTemplate },
   { href: "/app/account", label: "Account", icon: Wallet },
   { href: "/docs", label: "Docs", icon: BookOpen },
 ] as const;
@@ -30,14 +37,16 @@ function linkActive(pathname: string | null, href: string, mode: "studio" | "bro
   if (href === "/") return pathname === "/";
 
   if (mode === "studio") {
+    if (href === "/app/studio/publisher") return pathname === "/app/studio/publisher" || pathname.startsWith("/app/studio/publisher/");
     if (href === "/app/studio/campaigns") return pathname.startsWith("/app/studio/campaigns");
+    if (href === "/app/studio") return pathname === "/app/studio";
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
   if (href === "/docs") return pathname === "/docs" || pathname.startsWith("/docs/");
-  if (href === "/app/publisher") return pathname.startsWith("/app/publisher");
+  if (href === "/app/studio/publisher") return pathname.startsWith("/app/studio/publisher");
   if (href === "/app/account") return pathname.startsWith("/app/account");
-  if (href === "/app/studio/create") return pathname.startsWith("/app/studio");
+  if (href === "/app/studio") return pathname.startsWith("/app/studio");
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -46,7 +55,8 @@ export function Nav() {
   const chainId = useChainId();
   const ok = chainId === ADNODE_CHAIN_ID;
   const studioMode = pathname?.startsWith("/app/studio") ?? false;
-  const links = studioMode ? studioLinks : browseLinks;
+  const publisherStudioMode = pathname?.startsWith("/app/studio/publisher") ?? false;
+  const links = studioMode ? (publisherStudioMode ? publisherStudioLinks : studioLinks) : browseLinks;
   const mode = studioMode ? "studio" : "browse";
 
   return (
@@ -63,14 +73,14 @@ export function Nav() {
                 <Link
                   key={`${mode}-${href}`}
                   href={href}
-                  className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors sm:px-3 ${
+                  className={`group flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors sm:px-3 ${
                     active
                       ? "bg-accent/25 text-[var(--text)]"
                       : "text-muted hover:bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] hover:text-[var(--text)]"
                   }`}
                 >
                   <Icon size={17} strokeWidth={1.75} />
-                  <span className="max-w-[7.5rem] truncate sm:max-w-none">{label}</span>
+                  <HoverFlipText text={label} className="max-w-[7.5rem] truncate sm:max-w-none" />
                 </Link>
               );
             })}

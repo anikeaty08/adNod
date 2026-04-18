@@ -27,6 +27,7 @@ export const campaignMetadataSchema = z.object({
 
 export const slotMetadataSchema = z.object({
   chainSlotId: chainIdSchema,
+  slotKey: z.string().trim().optional(),
   siteName: z.string().trim().min(2).max(80),
   siteUrl: z.string().trim().url("Site URL must be a valid URL."),
   category: z.string().trim().min(2).max(40),

@@ -68,6 +68,73 @@ a {
   margin: 0 auto;
 }
 
+@layer components {
+  /* Reusable 3D flip label for navbar items (paired with .group:hover). */
+  .nav-flip {
+    display: inline-block;
+    position: relative;
+    height: 1em;
+    line-height: 1em;
+    overflow: hidden;
+    perspective: 900px;
+  }
+
+  .nav-flip-inner {
+    display: block;
+    position: relative;
+    transform-style: preserve-3d;
+  }
+
+  .nav-flip-layer {
+    display: block;
+    transform-style: preserve-3d;
+    transition:
+      transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    will-change: transform, opacity;
+  }
+
+  .nav-flip-front {
+    transform-origin: 50% 0%;
+    transform: translateY(0%) rotateX(0deg);
+  }
+
+  .nav-flip-back {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    transform-origin: 50% 100%;
+    transform: translateY(100%) rotateX(-90deg);
+    opacity: 0;
+  }
+
+  .group:hover .nav-flip-front {
+    transform: translateY(-100%) rotateX(90deg);
+    opacity: 0;
+  }
+
+  .group:hover .nav-flip-back {
+    transform: translateY(0%) rotateX(0deg);
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nav-flip-layer {
+      transition: none;
+    }
+    .nav-flip-back {
+      position: static;
+      transform: none;
+      opacity: 1;
+    }
+    .group:hover .nav-flip-front {
+      transform: none;
+      opacity: 1;
+    }
+  }
+}
+
 /* Legacy .panel — prefer GlassPanel; keep for gradual migration */
 .panel {
   background: var(--surface-solid);

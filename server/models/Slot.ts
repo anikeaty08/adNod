@@ -5,6 +5,7 @@ const { Schema, model, models } = mongoose;
 const SlotSchema = new Schema(
   {
     chainSlotId: { type: String, required: true, unique: true },
+    slotKey: { type: String, unique: true, sparse: true },
     siteName: { type: String, required: true },
     siteUrl: { type: String, required: true },
     category: { type: String, required: true },

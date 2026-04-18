@@ -24,6 +24,15 @@ type CampaignRow = {
 type SortKey = "newest" | "oldest" | "title_az" | "title_za" | "category_az" | "rate_high" | "rate_low";
 type PricingFilter = "all" | "CPC" | "CPM";
 
+function slugify(input: string) {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
 function parseCreatedAt(row: CampaignRow): number {
   const raw = row.createdAt;
   if (!raw) return 0;
@@ -192,7 +201,9 @@ export default function StudioCampaignsPage() {
           {filtered.map((r) => (
             <li key={String(r.chainCampaignId)}>
               <Link
-                href={`/app/studio/campaigns/${encodeURIComponent(String(r.chainCampaignId ?? ""))}`}
+                href={`/app/studio/campaigns/${encodeURIComponent(
+                  `${String(r.chainCampaignId ?? "")}-${slugify(String(r.title ?? "")) || "campaign"}`,
+                )}`}
                 className="block cursor-pointer rounded-xl border border-border bg-[color-mix(in_srgb,var(--surface-solid)_95%,transparent)] p-4 transition hover:border-accent/50 hover:bg-[color-mix(in_srgb,var(--accent)_8%,var(--surface-solid))]"
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">

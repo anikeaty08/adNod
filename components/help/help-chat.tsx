@@ -207,21 +207,27 @@ export function HelpChat() {
                 </div>
               </div>
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 text-sm">
-                {msgs.map((m, i) => (
-                  <div
-                    key={i}
-                    className={`max-w-[95%] rounded-xl px-3 py-2 whitespace-pre-wrap ${
-                      m.role === "user" ? "ml-auto bg-accent/25 text-[var(--text)]" : "mr-auto bg-[color-mix(in_srgb,var(--text)_8%,transparent)] text-muted"
-                    }`}
-                  >
-                    {m.content}
-                  </div>
-                ))}
+                {msgs.map((m, i) => {
+                  const isUser = m.role === "user";
+                  return (
+                    <div key={i} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                      <div
+                        className={`max-w-[92%] whitespace-pre-wrap rounded-2xl border px-3 py-2 leading-relaxed ${
+                          isUser
+                            ? "border-[color-mix(in_srgb,var(--accent)_45%,transparent)] bg-[color-mix(in_srgb,var(--accent)_18%,transparent)] text-[var(--text)]"
+                            : "border-[color-mix(in_srgb,var(--text)_10%,transparent)] bg-[color-mix(in_srgb,var(--text)_6%,transparent)] text-muted"
+                        }`}
+                      >
+                        {m.content}
+                      </div>
+                    </div>
+                  );
+                })}
                 <div ref={endRef} />
               </div>
-              <div className="flex shrink-0 gap-2 border-t border-border p-2">
+              <div className="flex shrink-0 gap-2 border-t border-border bg-[color-mix(in_srgb,var(--surface-solid)_96%,var(--accent)_4%)] p-2">
                 <input
-                  className="min-w-0 flex-1 rounded-xl border border-border bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:ring-2 focus:ring-accent/40"
+                  className="min-w-0 flex-1 rounded-2xl border border-border bg-[var(--bg)] px-3 py-2.5 text-sm text-[var(--text)] outline-none focus:ring-2 focus:ring-accent/40"
                   placeholder="Ask anything…"
                   value={input}
                   disabled={busy}
@@ -230,7 +236,7 @@ export function HelpChat() {
                 />
                 <button
                   type="button"
-                  className="rounded-xl bg-accent px-3 py-2 text-[var(--bg)] disabled:opacity-40"
+                  className="rounded-2xl bg-accent px-3 py-2.5 text-[var(--bg)] disabled:opacity-40"
                   disabled={busy}
                   onClick={() => void send()}
                   aria-label="Send"

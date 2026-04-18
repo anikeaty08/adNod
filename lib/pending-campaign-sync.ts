@@ -2,13 +2,12 @@
 
 type PendingCampaignSync = {
   chainCampaignId: string;
-  title: string;
-  description: string;
-  creativeURI: string;
-  category: string;
-  pricingModel: string;
-  rate: string;
-  advertiser: `0x${string}`;
+  txHash: `0x${string}`;
+  title?: string;
+  description?: string;
+  category?: string;
+  pricingModel?: "CPC" | "CPM";
+  rate?: string;
   updatedAt: number;
 };
 
@@ -56,4 +55,3 @@ export function clearPendingCampaignSync(chainCampaignId: string) {
     // ignore
   }
 }
-

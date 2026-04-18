@@ -1,3 +1,7 @@
+import { getCampaigns } from "./campaign-store.js";
+import { getSlots } from "./slot-store.js";
+import { getRegistryChainHealth } from "./chain-state.js";
+
 export interface AssistantMessage {
   role: "user" | "assistant";
   content: string;
@@ -31,6 +35,13 @@ const FAQ_ENTRIES: Array<{
     test: (text) => text.includes("what data is public"),
     reply:
       "Public data is limited to the creative URI, category, and slot metadata such as site name. Financial values like budget, CPC, impressions, clicks, and earnings stay encrypted.",
+  },
+  {
+    test: (text) =>
+      (text.includes("cpc") || text.includes("cpm") || text.includes("cost per click") || text.includes("cost per mille") || text.includes("metrics")) &&
+      (text.includes("adnode") || text.includes("campaign") || text.includes("settlement")),
+    reply:
+      "In AdNode, **CPC** and **CPM** are the on-chain settlement models:\n- **CPC**: hoster pays a fixed wei rate per *click*.\n- **CPM**: hoster pays a fixed wei rate per *1,000 impressions*.\nThe rate is public (shown in ETH), while budgets/bids/earnings stay encrypted.",
   },
   {
     test: (text) => text.includes("what blockchain is adnode on") || (text.includes("which blockchain") && text.includes("adnode")),
@@ -68,6 +79,75 @@ function normalizePrompt(prompt: string) {
 function getFaqReply(prompt: string) {
   const normalized = normalizePrompt(prompt);
   return FAQ_ENTRIES.find((entry) => entry.test(normalized))?.reply ?? null;
+}
+
+async function getDataReply(prompt: string) {
+  const normalized = normalizePrompt(prompt);
+
+  const asksCampaigns =
+    normalized.includes("campaign") &&
+    (normalized.includes("any") || normalized.includes("list") || normalized.includes("show") || normalized.includes("exists") || normalized.includes("available"));
+
+  const asksSlots =
+    normalized.includes("slot") &&
+    (normalized.includes("any") || normalized.includes("list") || normalized.includes("show") || normalized.includes("exists"));
+
+  const asksHealth = normalized.includes("health") || normalized.includes("status") || normalized.includes("rpc");
+
+  if (!asksCampaigns && !asksSlots && !asksHealth) return null;
+
+  const [campaigns, slots, health] = await Promise.all([
+    asksCampaigns ? getCampaigns() : Promise.resolve([]),
+    asksSlots ? getSlots() : Promise.resolve([]),
+    asksHealth ? getRegistryChainHealth() : Promise.resolve(null),
+  ]);
+
+  if (asksHealth && health) {
+    return {
+      reply: [
+        `**Network status**`,
+        `- chainId: \`${health.chainId}\``,
+        `- registry configured: \`${health.registryConfigured}\``,
+        `- RPC reads ok: \`${health.chainReadOk}\``,
+        health.blockNumber ? `- latest block: \`${health.blockNumber}\`` : null,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      model: "AdNode Live Data",
+    };
+  }
+
+  if (asksCampaigns) {
+    const rows = (Array.isArray(campaigns) ? campaigns : []) as Array<Record<string, unknown>>;
+    const ids = rows
+      .map((r) => String(r.chainCampaignId ?? ""))
+      .filter(Boolean)
+      .slice(0, 5);
+    return {
+      reply:
+        rows.length === 0
+          ? "No campaigns are in the API store yet. Create a campaign in Studio and it will show up here."
+          : `Yes — **${rows.length}** campaign(s) are listed. Latest ids: ${ids.map((id) => `#${id}`).join(", ")}.`,
+      model: "AdNode Live Data",
+    };
+  }
+
+  if (asksSlots) {
+    const rows = (Array.isArray(slots) ? slots : []) as Array<Record<string, unknown>>;
+    const ids = rows
+      .map((r) => String(r.chainSlotId ?? ""))
+      .filter(Boolean)
+      .slice(0, 5);
+    return {
+      reply:
+        rows.length === 0
+          ? "No slots are in the API store yet. Register a slot in Publisher and it will show up here."
+          : `Yes — **${rows.length}** slot(s) are listed. Latest ids: ${ids.map((id) => `#${id}`).join(", ")}.`,
+      model: "AdNode Live Data",
+    };
+  }
+
+  return null;
 }
 
 function sanitizeHistory(history: AssistantMessage[]) {
@@ -132,6 +212,9 @@ export async function getAssistantReply(prompt: string, history: AssistantMessag
   if (faqReply) {
     return { reply: faqReply, model: "AdNode FAQ" };
   }
+
+  const dataReply = await getDataReply(prompt);
+  if (dataReply) return dataReply;
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {

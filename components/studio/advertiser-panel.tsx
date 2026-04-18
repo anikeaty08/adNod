@@ -7,7 +7,7 @@ import { waitForTransactionReceipt } from "viem/actions";
 import type { Abi, PublicClient } from "viem";
 import { CONTRACTS, CONTRACTS_CONFIGURED, adRegistryAbi } from "@/lib/contracts";
 import { ADNODE_CHAIN_ID } from "@/lib/chain";
-import { getJson, signedPostJson, signedPostMultipart } from "@/lib/adnode-api";
+import { getJson, postJson, signedPostMultipart } from "@/lib/adnode-api";
 import { estimateFeeOverrides } from "@/lib/fees";
 import { clearPendingCampaignSync, loadPendingCampaignSync, savePendingCampaignSync } from "@/lib/pending-campaign-sync";
 import { GlassPanel } from "@/components/ui/glass-panel";
@@ -23,19 +23,6 @@ const UINT32_MAX = 4294967295n;
 
 const PRESET_CATEGORIES = ["news", "gaming", "finance", "tech", "lifestyle", "sports", "crypto", "podcasts", "education"];
 const CUSTOM_CAT = "__custom__";
-
-/** Ready-to-submit sample campaign (no curl) — connect wallet, review, then Pay & create. */
-const SAMPLE_CAMPAIGN: Record<string, string> = {
-  creativeUri: "https://picsum.photos/seed/adnode-demo/800/400",
-  title: "AdNode demo campaign",
-  description:
-    "Sample campaign for listings and embeds. Edit this copy before production. Category matches publisher slots using the same string.",
-  category: "news",
-  rate: "0.0001",
-  budgetEth: "0.01",
-  cpcUint32: "1000000",
-  initialFundEth: "0.01",
-};
 
 function toInTuple(enc: { ctHash: bigint; securityZone: number; utype: number; signature: `0x${string}` }) {
   return { ctHash: enc.ctHash, securityZone: enc.securityZone, utype: enc.utype, signature: enc.signature };
@@ -115,11 +102,11 @@ export function AdvertiserPanel() {
   const { data: walletClient } = useWalletClient();
   const { signMessageAsync } = useSignMessage();
 
-  const [creativeUri, setCreativeUri] = useState(SAMPLE_CAMPAIGN.creativeUri);
-  const [title, setTitle] = useState(SAMPLE_CAMPAIGN.title);
-  const [description, setDescription] = useState(SAMPLE_CAMPAIGN.description);
-  const [category, setCategory] = useState(SAMPLE_CAMPAIGN.category);
-  const [categoryMode, setCategoryMode] = useState<string>(SAMPLE_CAMPAIGN.category);
+  const [creativeUri, setCreativeUri] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("news");
+  const [categoryMode, setCategoryMode] = useState<string>("news");
   const [apiCategories, setApiCategories] = useState<string[]>([]);
 
   useEffect(() => {
@@ -140,10 +127,10 @@ export function AdvertiserPanel() {
     return [...m].sort((a, b) => a.localeCompare(b));
   }, [apiCategories]);
   const [pricingModel, setPricingModel] = useState<"CPC" | "CPM">("CPC");
-  const [rate, setRate] = useState(SAMPLE_CAMPAIGN.rate);
-  const [budgetEth, setBudgetEth] = useState(SAMPLE_CAMPAIGN.budgetEth);
-  const [cpcUint32, setCpcUint32] = useState(SAMPLE_CAMPAIGN.cpcUint32);
-  const [initialFundEth, setInitialFundEth] = useState(SAMPLE_CAMPAIGN.initialFundEth);
+  const [rate, setRate] = useState("");
+  const [budgetEth, setBudgetEth] = useState("");
+  const [cpcUint32, setCpcUint32] = useState("");
+  const [initialFundEth, setInitialFundEth] = useState("");
   const [busy, setBusy] = useState("");
   const [newCampaignId, setNewCampaignId] = useState<string | null>(null);
   const [pending, setPending] = useState<ReturnType<typeof loadPendingCampaignSync>>([]);
@@ -282,35 +269,25 @@ export function AdvertiserPanel() {
       const createdId = (next - 1n).toString();
       setNewCampaignId(createdId);
 
-      // Auto-sync so the landing page / publishers can discover the campaign via API immediately.
+      // Auto-save to API immediately (no manual sync step).
       try {
-        await signedPostJson(
-          "/api/campaigns",
-          "campaigns:create",
-          {
-            chainCampaignId: createdId,
-            title,
-            description,
-            creativeURI: creativeUri,
-            category,
-            pricingModel,
-            rate,
-            advertiser: address,
-          },
-          signMessageAsync,
-          address,
-        );
+        await postJson("/api/campaigns/auto", {
+          chainCampaignId: createdId,
+          txHash: hash,
+          title,
+          description,
+          pricingModel,
+          rate,
+        });
         clearPendingCampaignSync(createdId);
       } catch (e) {
         savePendingCampaignSync({
           chainCampaignId: createdId,
+          txHash: hash,
           title,
           description,
-          creativeURI: creativeUri,
-          category,
           pricingModel,
           rate,
-          advertiser: address,
         });
         setPending(loadPendingCampaignSync());
         setBusy(
@@ -334,65 +311,31 @@ export function AdvertiserPanel() {
     budgetEth,
     cpcUint32,
     initialFundEth,
-    signMessageAsync,
   ]);
 
   useEffect(() => {
     setPending(loadPendingCampaignSync());
   }, []);
 
-  const syncMetadata = useCallback(async () => {
-    if (!address || !newCampaignId) return;
-    await overlay.withLoading(async () => {
-      await signedPostJson(
-        "/api/campaigns",
-        "campaigns:create",
-        {
-          chainCampaignId: newCampaignId,
-          title,
-          description,
-          creativeURI: creativeUri,
-          category,
-          pricingModel,
-          rate,
-          advertiser: address,
-        },
-        signMessageAsync,
-        address,
-      );
-      clearPendingCampaignSync(newCampaignId);
-      setPending(loadPendingCampaignSync());
-    });
-  }, [address, newCampaignId, title, description, creativeUri, category, pricingModel, rate, overlay, signMessageAsync]);
-
   const retryPending = useCallback(
     async (id: string) => {
-      if (!address) throw new Error("Connect wallet first.");
       const row = loadPendingCampaignSync().find((p) => p.chainCampaignId === id);
       if (!row) throw new Error("No pending sync found for that id.");
       await overlay.withLoading(async () => {
-        await signedPostJson(
-          "/api/campaigns",
-          "campaigns:create",
-          {
-            chainCampaignId: row.chainCampaignId,
-            title: row.title,
-            description: row.description,
-            creativeURI: row.creativeURI,
-            category: row.category,
-            pricingModel: row.pricingModel,
-            rate: row.rate,
-            advertiser: address,
-          },
-          signMessageAsync,
-          address,
-        );
+        await postJson("/api/campaigns/auto", {
+          chainCampaignId: row.chainCampaignId,
+          txHash: row.txHash,
+          title: row.title ?? "",
+          description: row.description ?? "",
+          pricingModel: row.pricingModel ?? "CPC",
+          rate: row.rate ?? "",
+        });
         clearPendingCampaignSync(id);
         setPending(loadPendingCampaignSync());
         setBusy(`Synced campaign #${id} to API.`);
       });
     },
-    [address, overlay, signMessageAsync],
+    [overlay],
   );
 
   if (!CONTRACTS_CONFIGURED) {
@@ -405,10 +348,7 @@ export function AdvertiserPanel() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted">
-        Form is pre-filled with a demo creative URL and copy — connect your wallet on the AdNode chain, then use{" "}
-        <strong className="text-[var(--text)]">Pay &amp; create campaign</strong>. No curl or CLI; CoFHE encryption runs in your browser.
-      </p>
+      <p className="text-sm text-muted">Create a campaign and it will be listed automatically after your wallet confirms.</p>
       <GlassPanel className="p-5 md:p-6">
         <div className="mt-2 grid gap-6 md:grid-cols-2">
           <div className="space-y-4">
@@ -504,13 +444,7 @@ export function AdvertiserPanel() {
           <p className="text-sm text-muted">
             On-chain <span className="font-mono text-[var(--text)]">#{newCampaignId}</span>
           </p>
-          <PrimaryButton
-            className="mt-4"
-            disabled={!!busy}
-            onClick={() => void syncMetadata().catch((e) => setBusy(e instanceof Error ? e.message : "Sync failed"))}
-          >
-            Sync to API
-          </PrimaryButton>
+          <p className="mt-2 text-xs text-muted">Saved automatically to the API after confirmation.</p>
         </GlassPanel>
       ) : null}
 
@@ -521,7 +455,7 @@ export function AdvertiserPanel() {
             {pending.map((p) => (
               <li key={p.chainCampaignId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-[color-mix(in_srgb,var(--surface-solid)_95%,transparent)] px-3 py-2">
                 <span className="text-sm text-muted">
-                  Campaign <span className="font-mono text-[var(--text)]">#{p.chainCampaignId}</span> · {p.category}
+                  Campaign <span className="font-mono text-[var(--text)]">#{p.chainCampaignId}</span>
                 </span>
                 <PrimaryButton
                   variant="ghost"
@@ -533,9 +467,7 @@ export function AdvertiserPanel() {
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-xs text-muted">
-            This happens if the signature prompt was canceled or the request briefly failed. Retrying does not create a new on-chain campaign.
-          </p>
+          <p className="mt-3 text-xs text-muted">Retrying saves metadata to the API. It does not create a new on-chain campaign.</p>
         </GlassPanel>
       ) : null}
     </div>

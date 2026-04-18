@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import "dotenv/config";
 import { getCampaignByChainId, getCampaigns, createCampaign, createCampaignIfAbsent, sanitizeCampaignMetadata } from "../server/campaign-store.js";
-import { getSlots, createSlot, sanitizeSlotMetadata, assignSlotCampaign } from "../server/slot-store.js";
+import { getSlots, getSlotByKey, getSlotByChainId, createSlot, createSlotIfAbsent, sanitizeSlotMetadata, assignSlotCampaign } from "../server/slot-store.js";
 import { getDatabaseReady } from "../server/campaign-store.js";
 import { getRegistryChainHealth, getCampaignHoster, getSlotDeveloper, getAssignedCampaignId, getNextCampaignId, getCampaignPublicInfo, getCampaignSettlementTerms, adRegistryAddress, adAnalyticsAddress } from "../server/chain-state.js";
 import { assertSignedRequest } from "../server/request-auth.js";
@@ -12,7 +12,8 @@ import { getPublicCampaignById, getPublicCampaignBySlotId, createEmbedFramePaylo
 import { verifyMeasurementToken, buildMeasurementFingerprint, buildMeasurementEventKey } from "../server/measurement.js";
 import { recordMeasurement } from "../server/measurement-store.js";
 import { markMeasurementPending, syncMeasurementToChain, replayPendingMeasurements } from "../server/settlement-service.js";
-import { formatEther } from "viem";
+import { decodeEventLog, formatEther, parseEther } from "viem";
+import adRegistryAbi from "../src/lib/abi/AdRegistry.json" with { type: "json" };
 
 function getUrl(req: IncomingMessage) {
   const host = req.headers.host || "localhost";
@@ -57,6 +58,39 @@ async function handleAssistant(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
+async function handleAssistantChat(req: IncomingMessage, res: ServerResponse) {
+  if (req.method !== "POST") return methodNotAllowed(res, "POST");
+
+  const body = (await readJsonBody(req)) as Record<string, unknown>;
+  const prompt = String(body.prompt ?? "").trim();
+  const history = Array.isArray(body.history) ? (body.history as AssistantMessage[]) : [];
+
+  if (!prompt) return sendJson(res, 400, { error: "Prompt is required." });
+  if (prompt.length > 4000) return sendJson(res, 400, { error: "Prompt too long." });
+
+  // Lightweight per-IP limiter (best-effort; serverless instances may reset).
+  const ip =
+    (Array.isArray(req.headers["x-forwarded-for"]) ? req.headers["x-forwarded-for"][0] : req.headers["x-forwarded-for"]) ||
+    req.socket.remoteAddress ||
+    "unknown";
+  const key = String(ip);
+  const now = Date.now();
+  (globalThis as any).__adnodeChatBuckets ??= new Map<string, number[]>();
+  const buckets = (globalThis as any).__adnodeChatBuckets as Map<string, number[]>;
+  const prev = (buckets.get(key) ?? []).filter((t) => now - t < 60_000);
+  if (prev.length >= 30) return sendJson(res, 429, { error: "Too many requests. Please slow down." });
+  prev.push(now);
+  buckets.set(key, prev);
+
+  try {
+    const completion = await getAssistantReply(prompt, history);
+    return sendJson(res, 200, completion);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Assistant request failed.";
+    return sendJson(res, 502, { error: message });
+  }
+}
+
 async function handleCampaigns(req: IncomingMessage, res: ServerResponse) {
   if (req.method === "GET") {
     // Product behavior: campaigns created on-chain should show up in the UI even if the
@@ -84,7 +118,7 @@ async function handleCampaigns(req: IncomingMessage, res: ServerResponse) {
 
         const auto = await createCampaignIfAbsent({
           chainCampaignId: sid,
-          title: `Campaign #${sid}`,
+          title: "Untitled campaign",
           description: "On-chain campaign. Add details in Studio to customize this listing.",
           creativeURI,
           category,
@@ -139,11 +173,126 @@ async function handleCampaigns(req: IncomingMessage, res: ServerResponse) {
 async function handleCampaignById(req: IncomingMessage, res: ServerResponse, chainCampaignId: string) {
   if (req.method !== "GET") return methodNotAllowed(res, "GET");
   try {
-    const doc = await getCampaignByChainId(chainCampaignId);
-    if (!doc) return sendJson(res, 404, { error: "Not found" });
-    return sendJson(res, 200, doc);
+    const existing = await getCampaignByChainId(chainCampaignId);
+    if (existing) return sendJson(res, 200, existing);
+
+    const [creativeURI, category] = await getCampaignPublicInfo(chainCampaignId);
+    const [model, rateWei] = await getCampaignSettlementTerms(chainCampaignId);
+    const advertiser = (await getCampaignHoster(chainCampaignId)) as string;
+    const pricingModel = model === 2 ? "CPM" : "CPC";
+    const rawRate = formatEther(rateWei);
+    const [whole, frac = ""] = rawRate.split(".");
+    const rate = frac ? `${whole}.${frac.slice(0, 6)}`.replace(/\.$/, "") : whole;
+
+    const auto = await createCampaignIfAbsent({
+      chainCampaignId,
+      title: "Untitled campaign",
+      description: "On-chain campaign. Add details in Studio to customize this listing.",
+      creativeURI,
+      category,
+      pricingModel,
+      rate: rate || "0",
+      advertiser,
+    });
+
+    return sendJson(res, 200, auto);
   } catch (error) {
     return sendJson(res, 500, { error: error instanceof Error ? error.message : "Failed to load campaign." });
+  }
+}
+
+async function handleCampaignAutoSync(req: IncomingMessage, res: ServerResponse) {
+  if (req.method !== "POST") return methodNotAllowed(res, "POST");
+
+  let body: Record<string, unknown>;
+  try {
+    body = await readJsonBody(req);
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : "Invalid request body." });
+  }
+
+  const chainCampaignId = String(body.chainCampaignId ?? "").trim();
+  const txHash = String(body.txHash ?? "").trim();
+  const title = typeof body.title === "string" ? body.title : undefined;
+  const description = typeof body.description === "string" ? body.description : undefined;
+
+  if (!/^\d+$/.test(chainCampaignId)) return sendJson(res, 400, { error: "chainCampaignId is required." });
+  if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) return sendJson(res, 400, { error: "txHash is required." });
+  if (!adRegistryAddress) return sendJson(res, 500, { error: "AdRegistry is not configured on the server." });
+
+  // Unsigned endpoint: create-once only. Prevent public overwrites.
+  const existing = await getCampaignByChainId(chainCampaignId);
+  if (existing) return sendJson(res, 200, existing);
+
+  try {
+    const { serverPublicClient } = await import("../server/chain-state.js");
+    const receipt = await serverPublicClient.getTransactionReceipt({ hash: txHash as `0x${string}` });
+    if (receipt.status !== "success") throw new Error("Transaction did not succeed.");
+
+    let created:
+      | { hoster: string; creativeURI: string; category: string; initialFunding: bigint }
+      | undefined;
+
+    for (const log of receipt.logs) {
+      if (String(log.address ?? "").toLowerCase() !== adRegistryAddress.toLowerCase()) continue;
+      try {
+        const decoded = decodeEventLog({
+          abi: adRegistryAbi as any,
+          data: log.data,
+          topics: log.topics,
+        }) as { eventName: string; args: Record<string, unknown> };
+        if (decoded.eventName !== "CampaignCreated") continue;
+        const id = decoded.args.id as unknown;
+        const idText = typeof id === "bigint" ? id.toString() : String(id);
+        if (idText !== chainCampaignId) continue;
+        created = {
+          hoster: String(decoded.args.hoster ?? ""),
+          creativeURI: String(decoded.args.creativeURI ?? ""),
+          category: String(decoded.args.category ?? ""),
+          initialFunding: (decoded.args.initialFunding as bigint) ?? 0n,
+        };
+        break;
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!created) {
+      throw new Error("txHash does not match CampaignCreated for this campaign id.");
+    }
+
+    const advertiser = created.hoster.toLowerCase();
+
+    const [model, rateWei] = await getCampaignSettlementTerms(chainCampaignId);
+    const pricingModel = model === 2 ? "CPM" : "CPC";
+    const rawRate = formatEther(rateWei);
+    const [whole, frac = ""] = rawRate.split(".");
+    const rate = frac ? `${whole}.${frac.slice(0, 6)}`.replace(/\.$/, "") : whole;
+
+    // If the client provided rate, validate it matches chain terms.
+    if (typeof body.rate === "string" && body.rate.trim()) {
+      const wantWei = parseEther(body.rate);
+      if (wantWei !== rateWei) throw new Error("rate must match on-chain settlement terms.");
+    }
+    if (typeof body.pricingModel === "string" && body.pricingModel.trim()) {
+      const wantModel = body.pricingModel === "CPM" ? "CPM" : "CPC";
+      if (wantModel !== pricingModel) throw new Error(`pricingModel must match on-chain terms (${pricingModel}).`);
+    }
+
+    const row = await createCampaignIfAbsent({
+      chainCampaignId,
+      title: (title ?? "").trim() || "Untitled campaign",
+      description: (description ?? "").trim() || "On-chain campaign. Add details in Studio to customize this listing.",
+      creativeURI: created.creativeURI,
+      category: created.category,
+      pricingModel,
+      rate: rate || "0",
+      advertiser,
+    });
+
+    return sendJson(res, 201, row);
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : "Auto-sync failed." });
   }
 }
 
@@ -182,6 +331,79 @@ async function handleSlots(req: IncomingMessage, res: ServerResponse) {
 
   const slot = await createSlot(sanitized);
   return sendJson(res, 201, slot);
+}
+
+async function handleSlotAutoSync(req: IncomingMessage, res: ServerResponse) {
+  if (req.method !== "POST") return methodNotAllowed(res, "POST");
+
+  let body: Record<string, unknown>;
+  try {
+    body = await readJsonBody(req);
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : "Invalid request body." });
+  }
+
+  const chainSlotId = String(body.chainSlotId ?? "").trim();
+  const txHash = String(body.txHash ?? "").trim();
+  const siteUrl = typeof body.siteUrl === "string" ? body.siteUrl : "";
+  const dailyTrafficEstimate = typeof body.dailyTrafficEstimate === "string" ? body.dailyTrafficEstimate : "";
+
+  if (!/^\d+$/.test(chainSlotId)) return sendJson(res, 400, { error: "chainSlotId is required." });
+  if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) return sendJson(res, 400, { error: "txHash is required." });
+  if (!adRegistryAddress) return sendJson(res, 500, { error: "AdRegistry is not configured on the server." });
+
+  const existing = await getSlotByChainId(chainSlotId);
+  if (existing) return sendJson(res, 200, existing);
+
+  try {
+    const { serverPublicClient } = await import("../server/chain-state.js");
+    const receipt = await serverPublicClient.getTransactionReceipt({ hash: txHash as `0x${string}` });
+    if (receipt.status !== "success") throw new Error("Transaction did not succeed.");
+
+    let created: { developer: string; siteName: string; category: string } | undefined;
+
+    for (const log of receipt.logs) {
+      if (String(log.address ?? "").toLowerCase() !== adRegistryAddress.toLowerCase()) continue;
+      try {
+        const decoded = decodeEventLog({
+          abi: adRegistryAbi as any,
+          data: log.data,
+          topics: log.topics,
+        }) as { eventName: string; args: Record<string, unknown> };
+        if (decoded.eventName !== "SlotRegistered") continue;
+        const id = decoded.args.id as unknown;
+        const idText = typeof id === "bigint" ? id.toString() : String(id);
+        if (idText !== chainSlotId) continue;
+        created = {
+          developer: String(decoded.args.developer ?? ""),
+          siteName: String(decoded.args.siteName ?? ""),
+          category: String(decoded.args.category ?? ""),
+        };
+        break;
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!created) throw new Error("SlotRegistered event not found in receipt logs.");
+
+    const url = getUrl(req);
+    const origin = `${url.protocol}//${url.host}`;
+
+    const row = await createSlotIfAbsent({
+      chainSlotId,
+      siteName: created.siteName,
+      category: created.category,
+      siteUrl: siteUrl.trim() || origin,
+      dailyTrafficEstimate: /^\d+$/.test(dailyTrafficEstimate) ? dailyTrafficEstimate : "1000",
+      developer: created.developer,
+      assignedCampaignId: "",
+    });
+
+    return sendJson(res, 201, row);
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : "Auto-sync failed." });
+  }
 }
 
 async function handleSlotPatch(req: IncomingMessage, res: ServerResponse) {
@@ -243,19 +465,28 @@ async function handlePublicCampaign(req: IncomingMessage, res: ServerResponse) {
 async function handleEmbed(req: IncomingMessage, res: ServerResponse) {
   const url = getUrl(req);
   const mode = url.searchParams.get("mode") || "script";
-  const slotId = Number(url.searchParams.get("slotId"));
-  const hasSlotId = Number.isFinite(slotId) && slotId > 0;
+  const rawSlotId = url.searchParams.get("slotId");
+  const rawSlotKey = url.searchParams.get("slotKey");
+
+  let slotId: number | null = null;
+  if (rawSlotId && /^\d+$/.test(rawSlotId)) slotId = Number(rawSlotId);
+  if (!slotId && rawSlotKey) {
+    const slot = await getSlotByKey(String(rawSlotKey));
+    if (slot) slotId = Number(String((slot as { chainSlotId?: string }).chainSlotId ?? ""));
+  }
+
+  const hasSlotId = Number.isFinite(slotId) && (slotId ?? 0) > 0;
 
   if (!hasSlotId) {
     res.statusCode = 400;
     res.setHeader("Content-Type", mode === "frame" ? "text/html; charset=utf-8" : "application/javascript; charset=utf-8");
-    res.end(mode === "frame" ? "<p>AdNode slotId is required.</p>" : "console.error('AdNode slotId is required.');");
+    res.end(mode === "frame" ? "<p>AdNode slot is required.</p>" : "console.error('AdNode slot is required.');");
     return;
   }
 
   if (mode === "frame") {
     try {
-      const campaign = await getPublicCampaignBySlotId(slotId);
+      const campaign = await getPublicCampaignBySlotId(slotId as number);
       const origin = `${url.protocol}//${url.host}`;
       const payload = createEmbedFramePayload(campaign, origin);
       res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -272,7 +503,8 @@ async function handleEmbed(req: IncomingMessage, res: ServerResponse) {
   const origin = `${url.protocol}//${url.host}`;
   res.setHeader("Content-Type", "application/javascript; charset=utf-8");
   res.statusCode = 200;
-  res.end(buildEmbedScript(origin, { slotId }));
+  const identifier = rawSlotKey ? String(rawSlotKey) : String(slotId);
+  res.end(buildEmbedScript(origin, { slotKey: identifier, slotId: slotId as number }));
 }
 
 async function handleMeasure(req: IncomingMessage, res: ServerResponse) {
@@ -420,8 +652,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   try {
     if (p === "/health") return await handleHealth(req, res);
+    if (p === "/campaigns/auto") return await handleCampaignAutoSync(req, res);
     if (p === "/campaigns") return await handleCampaigns(req, res);
     if (p.startsWith("/campaigns/")) return await handleCampaignById(req, res, decodeURIComponent(p.slice("/campaigns/".length)));
+    if (p === "/slots/auto") return await handleSlotAutoSync(req, res);
     if (p === "/slots") return await handleSlots(req, res);
     if (p === "/slot") return await handleSlotPatch(req, res);
     if (p === "/public-campaign") return await handlePublicCampaign(req, res);
@@ -429,6 +663,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if (p === "/measure") return await handleMeasure(req, res);
     if (p === "/uploads/creative") return await handleUploadCreative(req, res);
     if (p === "/settlement/replay") return await handleSettlementReplay(req, res);
+    if (p === "/assistant/chat") return await handleAssistantChat(req, res);
     if (p === "/assistant") return await handleAssistant(req, res);
 
     return sendJson(res, 404, { error: "Not found" });

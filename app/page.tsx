@@ -39,17 +39,17 @@ export default function LandingPage() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-muted">Why we&apos;re building AdNode</p>
             <h1 className="font-display mt-4 text-4xl font-bold leading-[1.08] tracking-tight text-[var(--text)] md:text-5xl lg:text-[3.25rem]">
-              Ads that settle fairly — without broadcasting your whole playbook.
+              Ads that settle fairly â€” without broadcasting your whole playbook.
             </h1>
             <p className="mt-6 max-w-xl text-base leading-relaxed text-muted md:text-lg">
               Programmatic placements are stuck between opaque ad networks and fully public on-chain auctions. AdNode is a middle path:
               Fhenix-style confidential fields for budgets and bids, plus explicit CPC/CPM rules in wei so publishers and auditors see the same payout math.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
-              <PrimaryButton href="/app/studio/create">
-                <Megaphone size={18} /> Studio — create campaign
+              <PrimaryButton href="/app/studio">
+                <Megaphone size={18} /> Studio
               </PrimaryButton>
-              <PrimaryButton href="/app/publisher" variant="secondary">
+              <PrimaryButton href="/app/studio/publisher" variant="secondary">
                 <LayoutTemplate size={18} /> Publisher
               </PrimaryButton>
               <PrimaryButton href="/app/account" variant="ghost">
@@ -75,7 +75,7 @@ export default function LandingPage() {
               <Sparkles className="text-accent" size={26} strokeWidth={1.5} />
               <h3 className="font-display mt-3 text-lg font-semibold text-[var(--text)]">Modern product surface</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted">
-                Long-scroll marketing, GitBook-style docs, floating help chat, and motion overlays for loading and payments — so the app feels as serious as the contracts underneath.
+                Long-scroll marketing, GitBook-style docs, floating help chat, and motion overlays for loading and payments â€” so the app feels as serious as the contracts underneath.
               </p>
             </GlassPanel>
           </div>
@@ -84,7 +84,7 @@ export default function LandingPage() {
         <section id="workflow" className="scroll-mt-24">
           <h2 className="font-display text-2xl font-bold text-[var(--text)] md:text-3xl">How teams use it</h2>
           <p className="mt-2 max-w-2xl text-sm text-muted md:text-base">
-            Two roles, two journeys — same chain and API. Connect wallet, pick your path, ship.
+            Two roles, two journeys â€” same chain and API. Connect wallet, pick your path, ship.
           </p>
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             <GlassPanel className="p-6 md:p-8">
@@ -93,7 +93,7 @@ export default function LandingPage() {
                 <li>Upload or link a creative.</li>
                 <li>Set category and CPC/CPM terms.</li>
                 <li>Confirm encryption + payment in the wallet.</li>
-                <li>Sync metadata so publishers can discover the campaign.</li>
+                <li>After confirmation, the campaign appears automatically.</li>
               </ol>
               <PrimaryButton href="/app/studio/create" className="mt-6">
                 Start creating
@@ -107,8 +107,8 @@ export default function LandingPage() {
                 <li>Copy embed code (HTML, React, Next, or script).</li>
                 <li>Track earnings and withdraw from Account when rules align.</li>
               </ol>
-              <PrimaryButton href="/app/publisher" variant="secondary" className="mt-6">
-                Open publisher
+              <PrimaryButton href="/app/studio/publisher" variant="secondary" className="mt-6">
+                Publisher
               </PrimaryButton>
             </GlassPanel>
           </div>
@@ -121,20 +121,20 @@ export default function LandingPage() {
               <p className="mt-1 text-sm text-muted">Pulled from the AdNode API metadata store.</p>
             </div>
             <Link href="/docs" className="cursor-pointer text-sm text-accent hover:underline">
-              Read docs →
+              Read docs â†’
             </Link>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {featured.length === 0 ? (
               <GlassPanel className="p-5 sm:col-span-2 lg:col-span-3">
-                <p className="text-sm text-muted">No public campaigns in the API yet — create one from the studio after syncing metadata.</p>
+                <p className="text-sm text-muted">No public campaigns in the API yet — create one from Studio.</p>
               </GlassPanel>
             ) : (
               featured.map((c) => (
                   <GlassPanel key={String(c.chainCampaignId)} className="p-5">
                     <p className="font-mono text-xs text-muted">#{c.chainCampaignId}</p>
                     <p className="mt-1 font-display text-lg font-semibold text-[var(--text)]">{c.title ?? "Untitled"}</p>
-                    <p className="mt-1 text-sm text-muted">{c.category ?? "—"} · {c.pricingModel ?? "—"}</p>
+                    <p className="mt-1 text-sm text-muted">{c.category ?? "â€”"} Â· {c.pricingModel ?? "â€”"}</p>
                   </GlassPanel>
               ))
             )}

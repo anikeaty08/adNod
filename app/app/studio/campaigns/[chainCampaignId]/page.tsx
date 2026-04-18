@@ -33,13 +33,14 @@ const CHART_COLORS = ["#0ea5e9", "#6366f1", "#22c55e", "#f59e0b", "#ec4899"];
 function settlementLabel(model: number | undefined) {
   if (model === 1) return "CPC";
   if (model === 2) return "CPM";
-  return model != null ? `Model #${model}` : "—";
+  return model != null ? `Model #${model}` : "Ã¢â‚¬â€";
 }
 
 export default function StudioCampaignDetailPage() {
   const params = useParams();
   const rawId = decodeURIComponent(String(params.chainCampaignId ?? ""));
-  const idNum = Number(rawId);
+  const idPart = rawId.split("-")[0] ?? "";
+  const idNum = Number(idPart);
   const idOk = Number.isFinite(idNum) && idNum >= 1;
   const { address } = useAccount();
   const hydrated = useHydrated();
@@ -58,16 +59,16 @@ export default function StudioCampaignDetailPage() {
     setErr("");
     void (async () => {
       try {
-        const doc = await getJson<CampaignRow>(`/api/campaigns/${encodeURIComponent(rawId)}`);
+        const doc = await getJson<CampaignRow>(`/api/campaigns/${encodeURIComponent(String(idNum))}`);
         setRow(doc);
       } catch {
-        setErr("Not found or API unreachable.");
+        setErr("This campaign is still indexing. Refresh in a moment.");
         setRow(null);
       } finally {
         setLoading(false);
       }
     })();
-  }, [rawId]);
+  }, [rawId, idNum]);
 
   const { data: onchain, error: chainErr } = useReadContracts({
     contracts:
@@ -114,7 +115,7 @@ export default function StudioCampaignDetailPage() {
     const [available, totalFunded, totalSettled] = funding;
     return [
       {
-        name: `Campaign #${idNum}`,
+        name: "Funding",
         available: Number(formatEther(available)),
         settled: Number(formatEther(totalSettled)),
         funded: Number(formatEther(totalFunded)),
@@ -149,7 +150,7 @@ export default function StudioCampaignDetailPage() {
   }, [funding, row?.createdAt, hydrated]);
 
   if (loading) {
-    return <p className="text-sm text-muted">Loading…</p>;
+    return <p className="text-sm text-muted">LoadingÃ¢â‚¬Â¦</p>;
   }
 
   if (!idOk) {
@@ -157,31 +158,31 @@ export default function StudioCampaignDetailPage() {
       <GlassPanel className="p-6">
         <p className="text-muted">Invalid campaign id.</p>
         <Link href="/app/studio/campaigns" className="mt-4 inline-block text-sm text-accent hover:underline">
-          ← Your campaigns
+          Ã¢â€ Â Your campaigns
         </Link>
       </GlassPanel>
     );
   }
 
-  const chainTitle = pub?.[0] ?? "";
+  const chainCreative = pub?.[0] ?? "";
   const chainCategory = pub?.[1] ?? "";
   const chainActive = pub?.[2];
   const rateWei = terms?.[1];
 
-  const displayTitle = (row?.title ? String(row.title) : chainTitle) || `Campaign #${rawId}`;
-  const displayCategory = row?.category ? String(row.category) : chainCategory || "—";
+  const displayTitle = (row?.title ? String(row.title) : "Untitled campaign");
+  const displayCategory = row?.category ? String(row.category) : chainCategory || "Ã¢â‚¬â€";
 
   return (
     <div className="space-y-6">
       <Link href="/app/studio/campaigns" className="text-sm text-accent hover:underline">
-        ← Your campaigns
+        Ã¢â€ Â Your campaigns
       </Link>
 
       {!row && err ? (
         <GlassPanel className="border-amber-500/20 bg-amber-500/5 p-4">
           <p className="text-sm text-amber-100">{err}</p>
           <p className="mt-1 text-xs text-muted">
-            API metadata is missing — charts below still use the registry for this id if it exists.
+            On-chain charts still load from the registry.
           </p>
         </GlassPanel>
       ) : null}
@@ -189,19 +190,22 @@ export default function StudioCampaignDetailPage() {
       <header>
         <p className="font-mono text-xs text-muted">#{String(row?.chainCampaignId ?? rawId)}</p>
         <h1 className="font-display text-2xl font-bold text-[var(--text)] md:text-3xl">{displayTitle}</h1>
+        {(row?.creativeURI || chainCreative) ? (
+          <p className="mt-1 break-all font-mono text-xs text-muted">{String(row?.creativeURI ?? chainCreative)}</p>
+        ) : null}
         <p className="mt-2 text-sm text-muted">
           {displayCategory}
           {row ? (
             <>
               {" "}
-              · API: {String(row.pricingModel ?? "—")} · rate {String(row.rate ?? "—")}
+              Ã‚Â· API: {String(row.pricingModel ?? "Ã¢â‚¬â€")} Ã‚Â· rate {String(row.rate ?? "Ã¢â‚¬â€")}
             </>
           ) : null}
-          {typeof chainActive === "boolean" ? ` · on-chain ${chainActive ? "active" : "paused"}` : null}
+          {typeof chainActive === "boolean" ? ` Ã‚Â· on-chain ${chainActive ? "active" : "paused"}` : null}
         </p>
         {isHoster ? (
           <p className="mt-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
-            You are the registered hoster for this campaign — funding and settlement charts reflect your registry view.
+            You are the registered hoster for this campaign Ã¢â‚¬â€ funding and settlement charts reflect your registry view.
           </p>
         ) : address && hoster ? (
           <p className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
@@ -216,11 +220,11 @@ export default function StudioCampaignDetailPage() {
           {row ? (
             <>
               <p className="text-sm text-muted">
-                <strong className="text-[var(--text)]">Advertiser</strong> {String(row.advertiser ?? hoster ?? "—")}
+                <strong className="text-[var(--text)]">Advertiser</strong> {String(row.advertiser ?? hoster ?? "Ã¢â‚¬â€")}
               </p>
               <p className="text-sm text-muted">
                 <strong className="text-[var(--text)]">Creative</strong>{" "}
-                <span className="break-all font-mono text-xs">{String(row.creativeURI ?? "—")}</span>
+                <span className="break-all font-mono text-xs">{String(row.creativeURI ?? "Ã¢â‚¬â€")}</span>
               </p>
               <div>
                 <p className="text-xs font-semibold uppercase text-muted">Description</p>
@@ -228,13 +232,13 @@ export default function StudioCampaignDetailPage() {
               </div>
               {row.createdAt ? (
                 <p className="text-xs text-muted" suppressHydrationWarning>
-                  Synced {hydrated ? new Date(String(row.createdAt)).toLocaleString() : "—"}
+                  Synced {hydrated ? new Date(String(row.createdAt)).toLocaleString() : "Ã¢â‚¬â€"}
                 </p>
               ) : null}
             </>
           ) : (
             <p className="text-sm text-muted">
-              Sync this campaign from Studio after creation so title, links, and description appear here for publishers.
+              If you just created this campaign, details may take a moment to appear.
             </p>
           )}
         </GlassPanel>
@@ -246,29 +250,29 @@ export default function StudioCampaignDetailPage() {
           ) : chainErr ? (
             <p className="text-sm text-red-300">Could not read registry: {chainErr.message}</p>
           ) : !onchain ? (
-            <p className="text-sm text-muted">Loading chain data…</p>
+            <p className="text-sm text-muted">Loading chain dataÃ¢â‚¬Â¦</p>
           ) : (
             <ul className="space-y-2 text-sm text-muted">
               <li>
                 <span className="text-[var(--text)]">Hoster</span>{" "}
-                <span className="font-mono text-xs">{hoster ?? "—"}</span>
+                <span className="font-mono text-xs">{hoster ?? "Ã¢â‚¬â€"}</span>
               </li>
               <li>
-                <span className="text-[var(--text)]">Public title / category</span> {chainTitle || "—"} · {chainCategory || "—"}
+                <span className="text-[var(--text)]">Creative / category</span> {chainCreative || "Ã¢â‚¬â€"} Ã‚Â· {chainCategory || "Ã¢â‚¬â€"}
               </li>
               <li>
                 <span className="text-[var(--text)]">Settlement</span> {settlementLabel(terms?.[0])}{" "}
                 {rateWei != null ? (
-                  <span className="font-mono text-xs"> · {formatEther(rateWei)} ETH unit</span>
+                  <span className="font-mono text-xs"> Ã‚Â· {formatEther(rateWei)} ETH unit</span>
                 ) : null}
               </li>
               {funding ? (
                 <li>
-                  <span className="text-[var(--text)]">Funding handles</span> available {formatEther(funding[0])} · funded{" "}
-                  {formatEther(funding[1])} · settled {formatEther(funding[2])} (tFHE labels mirror Account)
+                  <span className="text-[var(--text)]">Funding handles</span> available {formatEther(funding[0])} Ã‚Â· funded{" "}
+                  {formatEther(funding[1])} Ã‚Â· settled {formatEther(funding[2])} (tFHE labels mirror Account)
                 </li>
               ) : (
-                <li>No funding tuple — id may be out of range for this registry.</li>
+                <li>No funding tuple Ã¢â‚¬â€ id may be out of range for this registry.</li>
               )}
             </ul>
           )}
@@ -278,7 +282,7 @@ export default function StudioCampaignDetailPage() {
       {CONTRACTS_CONFIGURED && funding && (
         <div className="grid gap-6 lg:grid-cols-2">
           <GlassPanel className="p-5">
-            <p className="mb-3 text-xs font-semibold uppercase text-muted">Bar — available vs settled vs funded</p>
+            <p className="mb-3 text-xs font-semibold uppercase text-muted">Bar Ã¢â‚¬â€ available vs settled vs funded</p>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={fundingBar}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#33415555" />
@@ -293,7 +297,7 @@ export default function StudioCampaignDetailPage() {
             </ResponsiveContainer>
           </GlassPanel>
           <GlassPanel className="p-5">
-            <p className="mb-3 text-xs font-semibold uppercase text-muted">Pie — settled vs remainder of funded</p>
+            <p className="mb-3 text-xs font-semibold uppercase text-muted">Pie Ã¢â‚¬â€ settled vs remainder of funded</p>
             {fundingPie.length === 0 ? (
               <p className="text-sm text-muted">Not enough non-zero values to chart.</p>
             ) : (
@@ -310,7 +314,7 @@ export default function StudioCampaignDetailPage() {
             )}
           </GlassPanel>
           <GlassPanel className="p-5 lg:col-span-2">
-            <p className="mb-3 text-xs font-semibold uppercase text-muted">Area — settled growth (API sync → now)</p>
+            <p className="mb-3 text-xs font-semibold uppercase text-muted">Area Ã¢â‚¬â€ settled growth (API sync Ã¢â€ â€™ now)</p>
             <p className="mb-2 text-xs text-muted">
               Impression/click counts live in encrypted analytics handles; this curve uses public settled totals at sync time vs now.
             </p>
