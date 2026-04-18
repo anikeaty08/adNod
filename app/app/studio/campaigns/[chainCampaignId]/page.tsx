@@ -22,6 +22,7 @@ import {
 } from "recharts";
 import { getJson } from "@/lib/adnode-api";
 import { useHydrated } from "@/lib/use-hydrated";
+import { displayCampaignTitle } from "@/lib/campaign-title";
 import { GlassPanel } from "@/components/ui/glass-panel";
 import { CONTRACTS, CONTRACTS_CONFIGURED, adRegistryAbi } from "@/lib/contracts";
 
@@ -169,7 +170,7 @@ export default function StudioCampaignDetailPage() {
   const chainActive = pub?.[2];
   const rateWei = terms?.[1];
 
-  const displayTitle = (row?.title ? String(row.title) : "Untitled campaign");
+  const displayTitle = displayCampaignTitle({ title: row?.title ? String(row.title) : null, chainCampaignId: idNum });
   const displayCategory = row?.category ? String(row.category) : chainCategory || "Ã¢â‚¬â€";
 
   return (

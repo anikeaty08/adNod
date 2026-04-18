@@ -8,6 +8,7 @@ import { GlassPanel } from "@/components/ui/glass-panel";
 import { PrimaryButton } from "@/components/ui/primary-button";
 import { Megaphone, LayoutTemplate, Wallet, Sparkles, Shield, Zap, BookOpen } from "lucide-react";
 import { getJson } from "@/lib/adnode-api";
+import { displayCampaignTitle } from "@/lib/campaign-title";
 
 type CampaignCard = {
   chainCampaignId?: string;
@@ -133,7 +134,9 @@ export default function LandingPage() {
               featured.map((c) => (
                   <GlassPanel key={String(c.chainCampaignId)} className="p-5">
                     <p className="font-mono text-xs text-muted">#{c.chainCampaignId}</p>
-                    <p className="mt-1 font-display text-lg font-semibold text-[var(--text)]">{c.title ?? "Untitled"}</p>
+                    <p className="mt-1 font-display text-lg font-semibold text-[var(--text)]">
+                      {displayCampaignTitle({ title: c.title ?? null, chainCampaignId: c.chainCampaignId ?? null })}
+                    </p>
                     <p className="mt-1 text-sm text-muted">{c.category ?? "â€”"} Â· {c.pricingModel ?? "â€”"}</p>
                   </GlassPanel>
               ))

@@ -6,6 +6,7 @@ import { useAccount } from "wagmi";
 import { Filter, Search } from "lucide-react";
 import { getJson } from "@/lib/adnode-api";
 import { useHydrated } from "@/lib/use-hydrated";
+import { displayCampaignTitle } from "@/lib/campaign-title";
 import { GlassPanel } from "@/components/ui/glass-panel";
 import { Field, TextInput, Select } from "@/components/ui/field";
 
@@ -209,7 +210,9 @@ export default function StudioCampaignsPage() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <p className="font-mono text-xs text-muted">#{r.chainCampaignId}</p>
-                    <p className="font-display text-lg font-semibold text-[var(--text)]">{r.title ?? "Untitled"}</p>
+                    <p className="font-display text-lg font-semibold text-[var(--text)]">
+                      {displayCampaignTitle({ title: r.title ?? null, chainCampaignId: r.chainCampaignId ?? null })}
+                    </p>
                     <p className="mt-1 text-sm text-muted">
                       {r.category ?? "—"} · {r.pricingModel ?? "—"} · rate {r.rate ?? "—"}
                     </p>
