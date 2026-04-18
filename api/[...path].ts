@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import "dotenv/config";
-import { getCampaignByChainId, getCampaigns, createCampaign, sanitizeCampaignMetadata } from "../server/campaign-store.js";
+import { getCampaignByChainId, getCampaigns, createCampaign, createCampaignIfAbsent, sanitizeCampaignMetadata } from "../server/campaign-store.js";
 import { getSlots, createSlot, sanitizeSlotMetadata, assignSlotCampaign } from "../server/slot-store.js";
 import { getDatabaseReady } from "../server/campaign-store.js";
-import { getRegistryChainHealth, getCampaignHoster, getSlotDeveloper, getAssignedCampaignId } from "../server/chain-state.js";
+import { getRegistryChainHealth, getCampaignHoster, getSlotDeveloper, getAssignedCampaignId, getNextCampaignId, getCampaignPublicInfo, getCampaignSettlementTerms } from "../server/chain-state.js";
 import { assertSignedRequest } from "../server/request-auth.js";
 import { readJsonBody } from "../server/http-body.js";
 import { parseMultipartUpload, uploadBufferToPinata } from "../server/pinata.js";
@@ -12,6 +12,7 @@ import { getPublicCampaignById, getPublicCampaignBySlotId, createEmbedFramePaylo
 import { verifyMeasurementToken, buildMeasurementFingerprint, buildMeasurementEventKey } from "../server/measurement.js";
 import { recordMeasurement } from "../server/measurement-store.js";
 import { markMeasurementPending, syncMeasurementToChain, replayPendingMeasurements } from "../server/settlement-service.js";
+import { formatEther } from "viem";
 
 function getUrl(req: IncomingMessage) {
   const host = req.headers.host || "localhost";
@@ -58,7 +59,49 @@ async function handleAssistant(req: IncomingMessage, res: ServerResponse) {
 
 async function handleCampaigns(req: IncomingMessage, res: ServerResponse) {
   if (req.method === "GET") {
+    // Product behavior: campaigns created on-chain should show up in the UI even if the
+    // hoster didn't (or couldn't) sync custom title/description metadata yet.
     const campaigns = await getCampaigns();
+    const existing = new Set(
+      (Array.isArray(campaigns) ? campaigns : []).map((c) => String((c as { chainCampaignId?: unknown }).chainCampaignId ?? "")),
+    );
+
+    try {
+      const nextId = await getNextCampaignId();
+      const latest = Number(nextId - 1n);
+      const LOOKBACK = 25;
+      const start = Math.max(1, latest - LOOKBACK + 1);
+      for (let id = start; id <= latest; id += 1) {
+        const sid = String(id);
+        if (existing.has(sid)) continue;
+        const [creativeURI, category] = await getCampaignPublicInfo(sid);
+        const [model, rateWei] = await getCampaignSettlementTerms(sid);
+        const advertiser = (await getCampaignHoster(sid)) as string;
+        const pricingModel = model === 2 ? "CPM" : "CPC";
+        const rawRate = formatEther(rateWei);
+        const [whole, frac = ""] = rawRate.split(".");
+        const rate = frac ? `${whole}.${frac.slice(0, 6)}`.replace(/\.$/, "") : whole;
+
+        const auto = await createCampaignIfAbsent({
+          chainCampaignId: sid,
+          title: `Campaign #${sid}`,
+          description: "On-chain campaign. Add details in Studio to customize this listing.",
+          creativeURI,
+          category,
+          pricingModel,
+          rate: rate || "0",
+          advertiser,
+        });
+        (campaigns as Array<Record<string, unknown>>).push(auto as Record<string, unknown>);
+        existing.add(sid);
+      }
+      (campaigns as Array<Record<string, unknown>>).sort(
+        (a, b) => Number(String((b as any).chainCampaignId ?? 0)) - Number(String((a as any).chainCampaignId ?? 0)),
+      );
+    } catch {
+      // ignore chain sync failures; still return DB results
+    }
+
     return sendJson(res, 200, campaigns);
   }
 

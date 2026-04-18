@@ -45,6 +45,38 @@ export async function getCampaignByChainId(chainCampaignId: string) {
   }
 }
 
+export async function createCampaignIfAbsent(payload: Record<string, unknown>) {
+  const sanitized = sanitizeCampaignMetadata(payload);
+
+  try {
+    await connectDatabase();
+    const existing = await CampaignModel.findOne({ chainCampaignId: sanitized.chainCampaignId })
+      .select(metadataFields.join(" "))
+      .lean();
+    if (existing) return existing;
+
+    return await CampaignModel.create(sanitized).then((doc) => {
+      const row = doc.toObject() as Record<string, unknown>;
+      const picked: Record<string, unknown> = {};
+      for (const k of metadataFields) picked[k] = row[k];
+      return picked;
+    });
+  } catch (error) {
+    if (strictModeEnabled()) throw error;
+    const existing = (memoryCampaigns as Array<Record<string, unknown>>).find(
+      (c) => String(c.chainCampaignId) === sanitized.chainCampaignId,
+    );
+    if (existing) return existing;
+    const localCampaign = {
+      ...sanitized,
+      _id: `local-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
+    memoryCampaigns.unshift(localCampaign);
+    return localCampaign;
+  }
+}
+
 export async function createCampaign(payload: Record<string, unknown>) {
   const sanitized = sanitizeCampaignMetadata(payload);
 

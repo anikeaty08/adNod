@@ -71,6 +71,35 @@ export async function getCampaignHoster(chainCampaignId: string) {
   })) as string;
 }
 
+export async function getNextCampaignId() {
+  const registryAddress = getRegistryAddress();
+  return (await publicClient.readContract({
+    address: registryAddress,
+    abi: adRegistryAbi as any,
+    functionName: "nextCampaignId" as any,
+  })) as bigint;
+}
+
+export async function getCampaignPublicInfo(chainCampaignId: string) {
+  const registryAddress = getRegistryAddress();
+  return (await publicClient.readContract({
+    address: registryAddress,
+    abi: adRegistryAbi as any,
+    functionName: "getPublicInfo" as any,
+    args: [BigInt(chainCampaignId)],
+  })) as [string, string, boolean];
+}
+
+export async function getCampaignSettlementTerms(chainCampaignId: string) {
+  const registryAddress = getRegistryAddress();
+  return (await publicClient.readContract({
+    address: registryAddress,
+    abi: adRegistryAbi as any,
+    functionName: "getSettlementTerms" as any,
+    args: [BigInt(chainCampaignId)],
+  })) as [number, bigint];
+}
+
 export async function getSlotDeveloper(chainSlotId: string) {
   const registryAddress = getRegistryAddress();
   const [developer] = (await publicClient.readContract({
