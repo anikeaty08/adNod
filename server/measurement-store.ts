@@ -1,5 +1,6 @@
 import { connectDatabase } from "./db.js";
 import { MeasurementModel } from "./models/Measurement.js";
+import { strictModeEnabled } from "./runtime.js";
 
 export interface MeasurementRecord {
   eventKey: string;
@@ -32,7 +33,8 @@ export async function recordMeasurement(payload: Omit<MeasurementRecord, "status
       status: "accepted",
     });
     return { duplicate: false, record: created.toObject() as MeasurementRecord };
-  } catch {
+  } catch (error) {
+    if (strictModeEnabled()) throw error;
     if (memoryMeasurements.has(payload.eventKey)) {
       return { duplicate: true, record: memoryMeasurements.get(payload.eventKey)! };
     }
@@ -53,7 +55,8 @@ export async function updateMeasurementStatus(eventKey: string, updates: Partial
   try {
     await connectDatabase();
     return await MeasurementModel.findOneAndUpdate({ eventKey }, updates, { new: true }).lean();
-  } catch {
+  } catch (error) {
+    if (strictModeEnabled()) throw error;
     const existing = memoryMeasurements.get(eventKey);
     if (!existing) {
       return null;
@@ -72,7 +75,8 @@ export async function listPendingMeasurements(limit = 50) {
       .sort({ createdAt: 1 })
       .limit(limit)
       .lean()) as unknown as MeasurementRecord[];
-  } catch {
+  } catch (error) {
+    if (strictModeEnabled()) throw error;
     return Array.from(memoryMeasurements.values())
       .filter((item) => item.status === "accepted" || item.status === "pending_chain")
       .slice(0, limit);

@@ -1,23 +1,53 @@
 import "dotenv/config";
-import express, { type Request, type Response } from "express";
-import { createCampaign, getCampaigns, getDatabaseReady, sanitizeCampaignMetadata } from "./campaign-store.js";
+import express, { type NextFunction, type Request, type Response } from "express";
+import { createCampaign, getCampaignByChainId, getCampaigns, getDatabaseReady, sanitizeCampaignMetadata } from "./campaign-store.js";
 import { parseMultipartUpload, uploadBufferToPinata } from "./pinata.js";
 import { getAssistantReply, type AssistantMessage } from "./assistant.js";
 import { buildEmbedFrameHtml, buildEmbedScript, createEmbedFramePayload, getPublicCampaignById, getPublicCampaignBySlotId } from "./public-campaigns.js";
 import { assignSlotCampaign, createSlot, getSlots, sanitizeSlotMetadata } from "./slot-store.js";
 import { assertSignedRequest } from "./request-auth.js";
-import { getAssignedCampaignId, getCampaignHoster, getSlotDeveloper } from "./chain-state.js";
+import { getAssignedCampaignId, getCampaignHoster, getRegistryChainHealth, getSlotDeveloper } from "./chain-state.js";
 import { buildMeasurementEventKey, buildMeasurementFingerprint, verifyMeasurementToken } from "./measurement.js";
 import { recordMeasurement } from "./measurement-store.js";
 import { markMeasurementPending, replayPendingMeasurements, syncMeasurementToChain } from "./settlement-service.js";
+import { assertRuntimeSafety } from "./runtime.js";
 
 const app = express();
 const localhostOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+const extraCorsOrigins = (process.env.ADNODE_CORS_ORIGINS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function corsAllowsOrigin(origin: string) {
+  return localhostOriginPattern.test(origin) || extraCorsOrigins.includes(origin);
+}
+const rateWindowMs = 60_000;
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function rateLimit(maxRequests: number, label: string) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const key = `${label}:${req.ip ?? req.socket.remoteAddress ?? "unknown"}`;
+    const now = Date.now();
+    const current = rateBuckets.get(key);
+    if (!current || now > current.resetAt) {
+      rateBuckets.set(key, { count: 1, resetAt: now + rateWindowMs });
+      next();
+      return;
+    }
+    if (current.count >= maxRequests) {
+      res.status(429).json({ error: "Rate limit exceeded." });
+      return;
+    }
+    current.count += 1;
+    next();
+  };
+}
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  if (origin && localhostOriginPattern.test(origin)) {
+  if (origin && corsAllowsOrigin(origin)) {
     res.header("Access-Control-Allow-Origin", origin);
     res.header("Vary", "Origin");
     res.header("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
@@ -36,12 +66,26 @@ app.use(express.json());
 
 app.get("/health", async (_req, res) => {
   const databaseReady = await getDatabaseReady();
-  res.json({ ok: true, service: "adnode-api", databaseReady });
+  const chain = await getRegistryChainHealth();
+  res.json({ ok: true, service: "adnode-api", databaseReady, ...chain });
 });
 
 app.get("/api/campaigns", async (_req, res) => {
   const campaigns = await getCampaigns();
   res.json(campaigns);
+});
+
+app.get("/api/campaigns/:chainCampaignId", async (req, res) => {
+  try {
+    const doc = await getCampaignByChainId(String(req.params.chainCampaignId ?? ""));
+    if (!doc) {
+      res.status(404).json({ error: "Campaign not found." });
+      return;
+    }
+    res.json(doc);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Lookup failed." });
+  }
 });
 
 app.get("/api/slots", async (_req, res) => {
@@ -126,7 +170,7 @@ app.get("/api/embed-frame", async (req, res) => {
   }
 });
 
-app.post("/api/measure", async (req, res) => {
+app.post("/api/measure", rateLimit(120, "measure"), async (req, res) => {
   const body = (req.body as Record<string, unknown>) ?? {};
   const token = String(body.token ?? "");
   const eventType = String(body.eventType ?? "");
@@ -159,14 +203,14 @@ app.post("/api/measure", async (req, res) => {
     return;
   }
 
-  const forwardedFor = req.headers["x-forwarded-for"];
-  const ip = Array.isArray(forwardedFor) ? forwardedFor[0] ?? "" : String(forwardedFor ?? req.socket.remoteAddress ?? "");
   const userAgent = String(req.headers["user-agent"] ?? "");
+  const remoteAddress = String(req.socket.remoteAddress ?? "");
   const fingerprint = buildMeasurementFingerprint({
-    ip,
+    remoteAddress,
     userAgent,
     eventType,
-    pageUrl,
+    campaignId: String(campaign.id),
+    slotId: String(campaign.slotId),
   });
   const eventKey = buildMeasurementEventKey({
     chainCampaignId: campaign.id,
@@ -206,7 +250,15 @@ app.post("/api/measure", async (req, res) => {
   }
 });
 
-app.post("/api/settlement/replay", async (_req, res) => {
+app.post("/api/settlement/replay", rateLimit(15, "replay"), async (req, res) => {
+  try {
+    const payload = ((req.body as Record<string, unknown> | undefined) ?? {});
+    await assertSignedRequest(req.headers, "settlement:replay", payload);
+  } catch (error) {
+    res.status(401).json({ error: error instanceof Error ? error.message : "Unauthorized request." });
+    return;
+  }
+
   try {
     const summary = await replayPendingMeasurements();
     res.json({ ok: true, ...summary });
@@ -336,6 +388,26 @@ app.post("/api/assistant", async (req, res) => {
   }
 });
 
+/** Unsigned chat for the in-app help widget (rate-limited). Groq key stays server-side. */
+app.post("/api/assistant/chat", rateLimit(30, "assistant-chat"), async (req, res) => {
+  const body = (req.body as Record<string, unknown>) ?? {};
+  const prompt = String(body.prompt ?? "").trim();
+  const history = Array.isArray(body.history) ? (body.history as AssistantMessage[]) : [];
+
+  if (!prompt || prompt.length > 4000) {
+    res.status(400).json({ error: "Prompt is required (max 4000 chars)." });
+    return;
+  }
+
+  try {
+    const completion = await getAssistantReply(prompt, history);
+    res.json(completion);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Assistant request failed.";
+    res.status(502).json({ error: message });
+  }
+});
+
 app.post("/api/uploads/creative", async (req, res) => {
   try {
     const file = await parseMultipartUpload(req);
@@ -361,6 +433,8 @@ getDatabaseReady().then((databaseReady) => {
     console.warn("MongoDB unavailable, starting AdNode API in local fallback mode.");
   }
 });
+
+assertRuntimeSafety();
 
 app.listen(port, () => {
   console.log(`AdNode API listening on http://localhost:${port}`);

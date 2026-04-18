@@ -1,6 +1,7 @@
 import { connectDatabase } from "./db.js";
 import { CampaignModel } from "./models/Campaign.js";
 import { campaignMetadataSchema } from "./validators.js";
+import { strictModeEnabled } from "./runtime.js";
 
 const memoryCampaigns: Record<string, unknown>[] = [];
 export const metadataFields = ["chainCampaignId", "title", "description", "creativeURI", "category", "pricingModel", "rate", "advertiser"] as const;
@@ -24,8 +25,23 @@ export async function getCampaigns() {
   try {
     await connectDatabase();
     return await CampaignModel.find().sort({ createdAt: -1 }).select(metadataFields.join(" ")).lean();
-  } catch {
+  } catch (error) {
+    if (strictModeEnabled()) throw error;
     return memoryCampaigns;
+  }
+}
+
+export async function getCampaignByChainId(chainCampaignId: string) {
+  const id = String(chainCampaignId ?? "").trim();
+  if (!id) return null;
+  try {
+    await connectDatabase();
+    return await CampaignModel.findOne({ chainCampaignId: id })
+      .select([...metadataFields, "createdAt"].join(" "))
+      .lean();
+  } catch (error) {
+    if (strictModeEnabled()) throw error;
+    return (memoryCampaigns as Array<Record<string, unknown>>).find((c) => String(c.chainCampaignId) === id) ?? null;
   }
 }
 
@@ -41,7 +57,8 @@ export async function createCampaign(payload: Record<string, unknown>) {
     })
       .select(metadataFields.join(" "))
       .lean();
-  } catch {
+  } catch (error) {
+    if (strictModeEnabled()) throw error;
     const localCampaign = {
       ...sanitized,
       _id: `local-${Date.now()}`,

@@ -12,7 +12,30 @@ function getIpfsGatewayUrl(uri: string) {
   return uri;
 }
 
+function isPrivateHost(hostname: string) {
+  const host = hostname.toLowerCase();
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1") return true;
+  if (host.endsWith(".local")) return true;
+  if (/^10\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) return true;
+  return false;
+}
+
+function isSafeAssetUrl(assetUrl: string) {
+  try {
+    const parsed = new URL(assetUrl);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+    if (isPrivateHost(parsed.hostname)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function resolveAssetKind(assetUrl: string) {
+  if (!isSafeAssetUrl(assetUrl)) {
+    return "unknown" as const;
+  }
+
   const lower = assetUrl.toLowerCase();
 
   if (lower.endsWith(".mp4") || lower.endsWith(".webm")) {
@@ -47,19 +70,24 @@ function assertRegistryConfigured() {
   }
 }
 
-export async function getPublicCampaignById(campaignId: number) {
+function getRegistryAddress(): `0x${string}` {
   assertRegistryConfigured();
+  return adRegistryAddress as `0x${string}`;
+}
+
+export async function getPublicCampaignById(campaignId: number) {
+  const registryAddress = getRegistryAddress();
 
   const [creativeURI, category, active] = (await publicClient.readContract({
-    address: adRegistryAddress,
-    abi: adRegistryAbi,
-    functionName: "getPublicInfo",
+    address: registryAddress,
+    abi: adRegistryAbi as any,
+    functionName: "getPublicInfo" as any,
     args: [BigInt(campaignId)],
   })) as [string, string, boolean];
   const advertiser = (await publicClient.readContract({
-    address: adRegistryAddress,
-    abi: adRegistryAbi,
-    functionName: "campaignHoster",
+    address: registryAddress,
+    abi: adRegistryAbi as any,
+    functionName: "campaignHoster" as any,
     args: [BigInt(campaignId)],
   })) as string;
 
@@ -92,12 +120,12 @@ export async function getPublicCampaignById(campaignId: number) {
 }
 
 export async function getPublicSlotById(slotId: number) {
-  assertRegistryConfigured();
+  const registryAddress = getRegistryAddress();
 
   const [developer, siteName, category, active, assignedCampaignId] = (await publicClient.readContract({
-    address: adRegistryAddress,
-    abi: adRegistryAbi,
-    functionName: "slots",
+    address: registryAddress,
+    abi: adRegistryAbi as any,
+    functionName: "slots" as any,
     args: [BigInt(slotId)],
   })) as [string, string, string, boolean, bigint];
 
@@ -157,9 +185,9 @@ export function buildEmbedFrameHtml(
   const description = escapeHtml(campaign.description);
   const category = escapeHtml(campaign.category);
   const assetUrl = escapeHtml(campaign.assetUrl);
-  const creativeLink = escapeHtml(campaign.creativeURI);
   const safeOrigin = escapeHtml(options.origin);
   const safeMeasurementToken = escapeHtml(options.measurementToken);
+  const creativeUrlJs = JSON.stringify(campaign.assetUrl);
 
   const media =
     campaign.assetKind === "video"
@@ -241,12 +269,12 @@ export function buildEmbedFrameHtml(
           <span>AdNode public creative</span>
           <span>${campaign.active ? "Active" : "Paused"}</span>
         </div>
-        <a class="cta" id="adnode-cta" href="${assetUrl}" target="_blank" rel="noreferrer">Open creative</a>
-        <div class="meta"><span>${creativeLink}</span></div>
+        <a class="cta" id="adnode-cta" href="#" role="button">Open creative</a>
       </div>
     </div>
     <script>
       (function () {
+        var creativeUrl = ${creativeUrlJs};
         var endpoint = "${safeOrigin}/api/measure";
         var token = "${safeMeasurementToken}";
         var sentImpression = false;
@@ -281,8 +309,12 @@ export function buildEmbedFrameHtml(
 
         var cta = document.getElementById("adnode-cta");
         if (cta) {
-          cta.addEventListener("click", function () {
+          cta.addEventListener("click", function (e) {
+            e.preventDefault();
             send("click");
+            if (creativeUrl) {
+              window.open(creativeUrl, "_blank", "noreferrer");
+            }
           });
         }
 

@@ -10,6 +10,11 @@ module.exports = {
     },
   },
   networks: {
+    fhenixHelium: {
+      url: process.env.FHENIX_HELIUM_RPC_URL || "https://api.helium.fhenix.zone",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 8008135,
+    },
     fhenixArbitrumSepolia: {
       url: process.env.VITE_FHENIX_RPC_URL || process.env.ARBITRUM_SEPOLIA_RPC_URL || "",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],

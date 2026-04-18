@@ -3,17 +3,7 @@ import "dotenv/config";
 import { createCampaign, getCampaigns, sanitizeCampaignMetadata } from "../server/campaign-store.js";
 import { assertSignedRequest } from "../server/request-auth.js";
 import { getCampaignHoster } from "../server/chain-state.js";
-
-async function readBody(req: IncomingMessage) {
-  const chunks: Buffer[] = [];
-
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-
-  if (!chunks.length) return {};
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-}
+import { readJsonBody } from "../server/http-body.js";
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   res.setHeader("Content-Type", "application/json");
@@ -26,7 +16,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   }
 
   if (req.method === "POST") {
-    const payload = (await readBody(req)) as Record<string, unknown>;
+    let payload: Record<string, unknown>;
+    try {
+      payload = await readJsonBody(req);
+    } catch (error) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: error instanceof Error ? error.message : "Invalid request body." }));
+      return;
+    }
     const candidate = sanitizeCampaignMetadata({
       ...payload,
       advertiser: String(payload.advertiser ?? ""),

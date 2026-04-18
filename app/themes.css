@@ -1,0 +1,85 @@
+/* Base tokens — overridden per [data-theme] */
+:root {
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --shadow-glow: 0 0 60px var(--glow);
+}
+
+[data-theme="nebula"] {
+  --bg: #06060a;
+  --bg-elevated: #0c0d14;
+  --surface: rgba(16, 18, 32, 0.72);
+  --surface-solid: #12142a;
+  --border: rgba(120, 140, 255, 0.22);
+  --text: #f4f6ff;
+  --muted: #8b93b8;
+  --accent: #6ee7ff;
+  --accent-2: #a78bfa;
+  --glow: rgba(110, 231, 255, 0.35);
+  --mesh-1: #1a1040;
+  --mesh-2: #0d2a38;
+  --mesh-3: #1e0a2e;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+}
+
+[data-theme="solar"] {
+  --bg: #0f0a06;
+  --bg-elevated: #1a120c;
+  --surface: rgba(42, 28, 18, 0.75);
+  --surface-solid: #241810;
+  --border: rgba(251, 146, 60, 0.28);
+  --text: #fff7ed;
+  --muted: #b89a82;
+  --accent: #fb923c;
+  --accent-2: #f472b6;
+  --glow: rgba(251, 146, 60, 0.4);
+  --mesh-1: #2a1508;
+  --mesh-2: #1a0a14;
+  --mesh-3: #301810;
+  --success: #4ade80;
+  --warning: #fcd34d;
+  --danger: #fb7185;
+}
+
+[data-theme="arctic"] {
+  --bg: #050a0f;
+  --bg-elevated: #0a1218;
+  --surface: rgba(12, 28, 40, 0.72);
+  --surface-solid: #0e1a24;
+  --border: rgba(56, 189, 248, 0.25);
+  --text: #e8f4fc;
+  --muted: #7aa0b8;
+  --accent: #38bdf8;
+  --accent-2: #818cf8;
+  --glow: rgba(56, 189, 248, 0.35);
+  --mesh-1: #061820;
+  --mesh-2: #0a1428;
+  --mesh-3: #041018;
+  --success: #2dd4bf;
+  --warning: #facc15;
+  --danger: #f87171;
+}
+
+[data-theme="mono"] {
+  --bg: #090909;
+  --bg-elevated: #111111;
+  --surface: rgba(24, 24, 24, 0.88);
+  --surface-solid: #181818;
+  --border: rgba(255, 255, 255, 0.12);
+  --text: #fafafa;
+  --muted: #a3a3a3;
+  --accent: #ffffff;
+  --accent-2: #d4d4d4;
+  --glow: rgba(255, 255, 255, 0.12);
+  --mesh-1: #0a0a0a;
+  --mesh-2: #141414;
+  --mesh-3: #0f0f0f;
+  --success: #86efac;
+  --warning: #fde047;
+  --danger: #fca5a5;
+}

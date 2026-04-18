@@ -6,25 +6,40 @@ import { privateKeyToAccount } from "viem/accounts";
 import { createPublicClient, createWalletClient, defineChain, formatEther, http, parseEther } from "viem";
 import { writeContract } from "viem/actions";
 import adAnalyticsAbi from "../src/lib/abi/AdAnalytics.json" with { type: "json" };
-import { adAnalyticsAddress } from "./chain-state.js";
+import adRegistryAbi from "../src/lib/abi/AdRegistry.json" with { type: "json" };
+import { adAnalyticsAddress, adRegistryAddress } from "./chain-state.js";
 import { listPendingMeasurements } from "./measurement-store.js";
 import { incrementAcceptedImpression, markSettledImpressionUnits } from "./settlement-state-store.js";
 import { updateMeasurementStatus, type MeasurementRecord } from "./measurement-store.js";
+import { arbitrumSepolia } from "viem/chains";
+import { FHELIUM_CHAIN_ID, getConfiguredChainId } from "./runtime.js";
 
 const settlementPrivateKey = process.env.SETTLEMENT_PRIVATE_KEY || process.env.PRIVATE_KEY;
-const rpcUrl = process.env.VITE_FHENIX_RPC_URL || process.env.ARBITRUM_SEPOLIA_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc";
-const chainId = Number(process.env.VITE_CHAIN_ID || 421614);
+const chainId = getConfiguredChainId();
+const rpcUrl =
+  process.env.VITE_FHENIX_RPC_URL ||
+  process.env.ARBITRUM_SEPOLIA_RPC_URL ||
+  (chainId === arbitrumSepolia.id
+    ? arbitrumSepolia.rpcUrls.default.http[0]
+    : "https://api.helium.fhenix.zone");
+const UINT64_MAX = (1n << 64n) - 1n;
 
-const chain = defineChain({
-  id: chainId,
-  name: "Arbitrum Sepolia",
-  network: "arbitrum-sepolia",
-  nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
-  rpcUrls: {
-    default: { http: [rpcUrl] },
-    public: { http: [rpcUrl] },
-  },
-});
+const chain =
+  chainId === arbitrumSepolia.id
+    ? {
+        ...arbitrumSepolia,
+        rpcUrls: { default: { http: [rpcUrl] }, public: { http: [rpcUrl] } },
+      }
+    : defineChain({
+        id: chainId,
+        name: chainId === FHELIUM_CHAIN_ID ? "Fhenix Helium" : "Configured Chain",
+        network: chainId === FHELIUM_CHAIN_ID ? "fhenix-helium" : "configured-chain",
+        nativeCurrency: { name: "tFHE", symbol: "tFHE", decimals: 18 },
+        rpcUrls: {
+          default: { http: [rpcUrl] },
+          public: { http: [rpcUrl] },
+        },
+      });
 
 let cofheClientPromise: ReturnType<typeof createCofheClient> | null = null;
 
@@ -73,7 +88,50 @@ async function getCofheNodeClient() {
 }
 
 function computePayoutWei(rate: string, billingUnits: bigint) {
-  return parseEther(rate) * billingUnits;
+  const wei = parseEther(rate) * billingUnits;
+  if (wei < 0n) {
+    throw new Error("Settlement payout cannot be negative.");
+  }
+  if (wei > UINT64_MAX) {
+    throw new Error("Settlement payout exceeds uint64 encryption bound.");
+  }
+  return wei;
+}
+
+const MAX_CPM_UNITS_PER_SETTLEMENT = 10_000n;
+
+async function assertPayoutMatchesOnChainTerms(
+  publicClient: ReturnType<typeof createPublicClient>,
+  record: MeasurementRecord,
+  payoutWei: bigint,
+) {
+  if (payoutWei === 0n) return;
+  if (!adRegistryAddress) {
+    throw new Error("VITE_ADREGISTRY_ADDRESS is required to verify settlement terms.");
+  }
+
+  const [model, rateWei] = (await publicClient.readContract({
+    address: adRegistryAddress,
+    abi: adRegistryAbi as any,
+    functionName: "getSettlementTerms" as any,
+    args: [BigInt(record.chainCampaignId)],
+  })) as [number, bigint];
+
+  if (model === 0 || rateWei === 0n) {
+    throw new Error("Campaign has no on-chain settlement terms; create the campaign with the updated createCampaign signature.");
+  }
+
+  if (record.pricingModel === "CPC") {
+    if (model !== 1) throw new Error("On-chain settlement model is not CPC.");
+    if (payoutWei !== rateWei) throw new Error(`CPC payout wei ${payoutWei} must equal on-chain rate ${rateWei}.`);
+  } else if (record.pricingModel === "CPM") {
+    if (model !== 2) throw new Error("On-chain settlement model is not CPM.");
+    if (payoutWei % rateWei !== 0n) throw new Error("CPM payout must be a whole multiple of on-chain rate wei.");
+    const units = payoutWei / rateWei;
+    if (units < 1n || units > MAX_CPM_UNITS_PER_SETTLEMENT) {
+      throw new Error(`CPM units ${units} out of allowed range.`);
+    }
+  }
 }
 
 async function encryptPayoutAmount(payoutWei: bigint) {
@@ -136,6 +194,7 @@ export async function syncMeasurementToChain(record: MeasurementRecord) {
   }
 
   if (payoutWei > 0n) {
+    await assertPayoutMatchesOnChainTerms(publicClient, record, payoutWei);
     const encryptedAmount = await encryptPayoutAmount(payoutWei);
     const txHash = await writeContract(walletClient, {
       address: analyticsAddress,

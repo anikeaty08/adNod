@@ -4,17 +4,7 @@ import { buildMeasurementEventKey, buildMeasurementFingerprint, verifyMeasuremen
 import { recordMeasurement } from "../server/measurement-store.js";
 import { getPublicCampaignBySlotId } from "../server/public-campaigns.js";
 import { markMeasurementPending, syncMeasurementToChain } from "../server/settlement-service.js";
-
-async function readBody(req: IncomingMessage) {
-  const chunks: Buffer[] = [];
-
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-
-  if (!chunks.length) return {};
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-}
+import { readJsonBody } from "../server/http-body.js";
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   res.setHeader("Content-Type", "application/json");
@@ -26,7 +16,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return;
   }
 
-  const body = (await readBody(req)) as Record<string, unknown>;
+  let body: Record<string, unknown>;
+  try {
+    body = await readJsonBody(req);
+  } catch (error) {
+    res.statusCode = 400;
+    res.end(JSON.stringify({ error: error instanceof Error ? error.message : "Invalid request body." }));
+    return;
+  }
   const token = String(body.token ?? "");
   const eventType = String(body.eventType ?? "");
   const pageUrl = String(body.pageUrl ?? "");
@@ -62,14 +59,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return;
   }
 
-  const forwardedFor = req.headers["x-forwarded-for"];
-  const ip = Array.isArray(forwardedFor) ? forwardedFor[0] ?? "" : String(forwardedFor ?? "");
+  const remoteAddress = String(req.socket.remoteAddress ?? "");
   const userAgent = Array.isArray(req.headers["user-agent"]) ? req.headers["user-agent"][0] ?? "" : String(req.headers["user-agent"] ?? "");
   const fingerprint = buildMeasurementFingerprint({
-    ip,
+    remoteAddress,
     userAgent,
     eventType,
-    pageUrl,
+    campaignId: String(campaign.id),
+    slotId: String(campaign.slotId),
   });
   const eventKey = buildMeasurementEventKey({
     chainCampaignId: campaign.id,

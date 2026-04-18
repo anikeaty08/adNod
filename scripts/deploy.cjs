@@ -48,6 +48,9 @@ async function main() {
   fs.writeFileSync(path.join(abiDir, "AdNodePayoutWrapper.json"), JSON.stringify(payoutWrapperArtifact.abi, null, 2));
   fs.writeFileSync(path.join(abiDir, "AdRegistry.json"), JSON.stringify(registryArtifact.abi, null, 2));
   fs.writeFileSync(path.join(abiDir, "AdAnalytics.json"), JSON.stringify(analyticsArtifact.abi, null, 2));
+  fs.writeFileSync(path.join(abiDir, "payout-wrapper-abi.json"), JSON.stringify(payoutWrapperArtifact.abi, null, 2));
+  fs.writeFileSync(path.join(abiDir, "registry-abi.json"), JSON.stringify(registryArtifact.abi, null, 2));
+  fs.writeFileSync(path.join(abiDir, "analytics-abi.json"), JSON.stringify(analyticsArtifact.abi, null, 2));
 
   console.log(`AdNodePayoutWrapper deployed to ${deployment.payoutWrapper} on ${network.name}`);
   console.log(`AdRegistry deployed to ${deployment.adRegistry} on ${network.name}`);

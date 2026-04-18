@@ -49,10 +49,16 @@ export function verifyMeasurementToken(token: string) {
   return payload;
 }
 
-export function buildMeasurementFingerprint(input: { ip: string; userAgent: string; eventType: string; pageUrl: string }) {
+export function buildMeasurementFingerprint(input: {
+  remoteAddress: string;
+  userAgent: string;
+  eventType: string;
+  campaignId: string;
+  slotId: string;
+}) {
   return crypto
     .createHash("sha256")
-    .update(`${input.ip}|${input.userAgent}|${input.eventType}|${input.pageUrl}`)
+    .update(`${input.remoteAddress}|${input.userAgent}|${input.eventType}|${input.campaignId}|${input.slotId}`)
     .digest("hex");
 }
 

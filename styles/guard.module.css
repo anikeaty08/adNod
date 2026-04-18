@@ -1,0 +1,39 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 9, 13, 0.9);
+  display: grid;
+  place-items: center;
+  z-index: 80;
+}
+
+.card {
+  width: min(420px, 92vw);
+  background: #10121a;
+  border: 1px solid #21273a;
+  border-radius: 16px;
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.label {
+  color: #a78bfa;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+}
+
+.cta {
+  margin-top: 1rem;
+  background: #4f8ef7;
+  border: 0;
+  color: #f0f4ff;
+  border-radius: 12px;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+}
+
+.sticker {
+  max-width: 140px;
+  margin: 0 auto;
+}

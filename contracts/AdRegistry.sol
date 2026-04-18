@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+/// @title AdRegistry
+/// @notice Fhenix CoFHE-aligned registry: confidential campaign economics on-chain (`euint64` budget, `euint32` CPC via `FHE.sol`),
+///         plus **public settlement terms** (`settlementPricingModel`, `settlementRateWei`) so payouts are bound to hoster-declared
+///         CPC/CPM rules. Creative media stays off-chain (typically IPFS); the chain stores a URI and enforces funding + settlement.
+/// @dev CoFHE (per Fhenix docs) couples on-chain contracts with off-chain FHE execution, permits, and threshold decryption — this contract
+///      uses encrypted handles for budget/CPC while keeping measurement/settlement amounts in plaintext wei for `reserveDeveloperPayout`.
+
 import {FHE, euint32, euint64, InEuint32, InEuint64} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -10,6 +17,14 @@ interface IAdNodePayoutWrapper {
 }
 
 contract AdRegistry is Ownable, ReentrancyGuard {
+    /// @notice On-chain settlement pricing. Encrypted budget/cpc are for confidentiality; these terms bind payout amounts.
+    /// @dev 0 = legacy / not enforced (pre-upgrade campaigns only). 1 = CPC (wei per click). 2 = CPM (wei per 1000-impression billing unit).
+    uint8 public constant SETTLEMENT_NONE = 0;
+    uint8 public constant SETTLEMENT_CPC = 1;
+    uint8 public constant SETTLEMENT_CPM = 2;
+    /// @dev Max CPM thousand-blocks per single settlement tx (prevents oversized reserve in one call).
+    uint256 public constant MAX_CPM_UNITS_PER_SETTLEMENT = 10_000;
+
     struct Campaign {
         address hoster;
         string creativeURI;
@@ -20,6 +35,8 @@ contract AdRegistry is Ownable, ReentrancyGuard {
         uint256 availableFunds;
         uint256 totalFunded;
         uint256 totalSettled;
+        uint8 settlementPricingModel;
+        uint256 settlementRateWei;
     }
 
     struct Slot {
@@ -70,16 +87,27 @@ contract AdRegistry is Ownable, ReentrancyGuard {
         string calldata creativeURI,
         string calldata category,
         InEuint64 calldata budget,
-        InEuint32 calldata cpc
+        InEuint32 calldata cpc,
+        uint8 settlementPricingModel,
+        uint256 settlementRateWei
     ) external payable returns (uint256 id) {
+        require(
+            settlementPricingModel == SETTLEMENT_CPC || settlementPricingModel == SETTLEMENT_CPM,
+            "Invalid settlement pricing"
+        );
+        require(settlementRateWei > 0, "Settlement rate required");
+
         id = nextCampaignId++;
 
         euint64 encryptedBudget = FHE.asEuint64(budget);
         euint32 encryptedCpc = FHE.asEuint32(cpc);
-        FHE.allowThis(encryptedBudget);
-        FHE.allow(encryptedBudget, msg.sender);
-        FHE.allowThis(encryptedCpc);
-        FHE.allow(encryptedCpc, msg.sender);
+        // NOTE: On some CoFHE TaskManager deployments, ACL updates for freshly-verified inputs
+        // can revert (empty revert data), even when verifyInput succeeds. Since AdRegistry does
+        // not currently operate on these ciphertexts on-chain (they are stored + returned to
+        // the hoster via gated getters), we avoid explicit ACL mutations here.
+        //
+        // If you later add on-chain FHE ops that require the registry to be allowed, you may
+        // need to reintroduce allow calls with updated CoFHE semantics.
 
         campaigns[id] = Campaign({
             hoster: msg.sender,
@@ -90,7 +118,9 @@ contract AdRegistry is Ownable, ReentrancyGuard {
             active: true,
             availableFunds: msg.value,
             totalFunded: msg.value,
-            totalSettled: 0
+            totalSettled: 0,
+            settlementPricingModel: settlementPricingModel,
+            settlementRateWei: settlementRateWei
         });
 
         emit CampaignCreated(id, msg.sender, creativeURI, category, msg.value);
@@ -134,6 +164,12 @@ contract AdRegistry is Ownable, ReentrancyGuard {
     function getPublicInfo(uint256 id) external view returns (string memory creativeURI, string memory category, bool active) {
         Campaign storage campaign = campaigns[id];
         return (campaign.creativeURI, campaign.category, campaign.active);
+    }
+
+    /// @notice Public settlement terms used to enforce payout amounts in reserveDeveloperPayout.
+    function getSettlementTerms(uint256 id) external view returns (uint8 settlementPricingModel, uint256 settlementRateWei) {
+        Campaign storage campaign = campaigns[id];
+        return (campaign.settlementPricingModel, campaign.settlementRateWei);
     }
 
     function getMyBudget(uint256 id) external view returns (euint64 encryptedBudget) {
@@ -202,6 +238,17 @@ contract AdRegistry is Ownable, ReentrancyGuard {
         require(slot.assignedCampaignId == campaignId, "Slot assignment mismatch");
         require(amount > 0, "Amount must be positive");
         require(campaign.availableFunds >= amount, "Insufficient campaign funds");
+
+        if (campaign.settlementRateWei > 0 && campaign.settlementPricingModel != SETTLEMENT_NONE) {
+            if (campaign.settlementPricingModel == SETTLEMENT_CPC) {
+                require(amount == campaign.settlementRateWei, "CPC payout mismatch");
+            } else if (campaign.settlementPricingModel == SETTLEMENT_CPM) {
+                require(amount >= campaign.settlementRateWei, "CPM below unit");
+                require(amount % campaign.settlementRateWei == 0, "CPM not unit multiple");
+                uint256 units = amount / campaign.settlementRateWei;
+                require(units >= 1 && units <= MAX_CPM_UNITS_PER_SETTLEMENT, "CPM units OOB");
+            }
+        }
 
         developer = slot.developer;
         campaign.availableFunds -= amount;

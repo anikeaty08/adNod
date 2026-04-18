@@ -3,17 +3,7 @@ import "dotenv/config";
 import { assignSlotCampaign } from "../server/slot-store.js";
 import { assertSignedRequest } from "../server/request-auth.js";
 import { getAssignedCampaignId, getSlotDeveloper } from "../server/chain-state.js";
-
-async function readBody(req: IncomingMessage) {
-  const chunks: Buffer[] = [];
-
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-
-  if (!chunks.length) return {};
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-}
+import { readJsonBody } from "../server/http-body.js";
 
 function getUrl(req: IncomingMessage) {
   return new URL(req.url || "/", "http://localhost");
@@ -31,7 +21,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   const url = getUrl(req);
   const chainSlotId = url.searchParams.get("chainSlotId") ?? "";
-  const body = (await readBody(req)) as Record<string, unknown>;
+  let body: Record<string, unknown>;
+  try {
+    body = await readJsonBody(req);
+  } catch (error) {
+    res.statusCode = 400;
+    res.end(JSON.stringify({ error: error instanceof Error ? error.message : "Invalid request body." }));
+    return;
+  }
   const payload = { assignedCampaignId: String(body.assignedCampaignId ?? "") };
   let signerAddress = "";
 

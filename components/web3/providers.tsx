@@ -1,0 +1,31 @@
+"use client";
+
+import { ReactNode } from "react";
+import { WagmiProvider } from "wagmi";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
+import { wagmiConfig } from "@/lib/wagmi";
+import { adnodeChain } from "@/lib/chain";
+import { AppChrome } from "@/components/app-chrome";
+import "@rainbow-me/rainbowkit/styles.css";
+
+const queryClient = new QueryClient();
+
+export function Web3Providers({ children }: { children: ReactNode }) {
+  return (
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <RainbowKitProvider
+          theme={darkTheme({
+            accentColor: "#4f8ef7",
+            accentColorForeground: "#f0f4ff",
+            borderRadius: "medium",
+          })}
+          initialChain={adnodeChain}
+        >
+          <AppChrome>{children}</AppChrome>
+        </RainbowKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  );
+}

@@ -1,5 +1,6 @@
 import { connectDatabase } from "./db.js";
 import { SettlementStateModel } from "./models/SettlementState.js";
+import { strictModeEnabled } from "./runtime.js";
 
 interface SettlementState {
   chainCampaignId: string;
@@ -23,7 +24,8 @@ export async function incrementAcceptedImpression(chainCampaignId: string, chain
       { upsert: true, new: true, setDefaultsOnInsert: true },
     ).lean();
     return next as unknown as SettlementState;
-  } catch {
+  } catch (error) {
+    if (strictModeEnabled()) throw error;
     const key = keyFor(chainCampaignId, chainSlotId);
     const current = memoryStates.get(key) ?? {
       chainCampaignId,
@@ -49,7 +51,8 @@ export async function markSettledImpressionUnits(chainCampaignId: string, chainS
       { upsert: true, new: true, setDefaultsOnInsert: true },
     ).lean();
     return next as unknown as SettlementState;
-  } catch {
+  } catch (error) {
+    if (strictModeEnabled()) throw error;
     const key = keyFor(chainCampaignId, chainSlotId);
     const current = memoryStates.get(key) ?? {
       chainCampaignId,

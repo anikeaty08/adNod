@@ -1,6 +1,7 @@
 import { connectDatabase } from "./db.js";
 import { SlotModel } from "./models/Slot.js";
 import { slotMetadataSchema } from "./validators.js";
+import { strictModeEnabled } from "./runtime.js";
 
 const memorySlots: Record<string, unknown>[] = [];
 export const slotFields = ["chainSlotId", "siteName", "siteUrl", "category", "dailyTrafficEstimate", "developer", "assignedCampaignId"] as const;
@@ -23,7 +24,8 @@ export async function getSlots() {
   try {
     await connectDatabase();
     return await SlotModel.find().sort({ createdAt: -1 }).select(slotFields.join(" ")).lean();
-  } catch {
+  } catch (error) {
+    if (strictModeEnabled()) throw error;
     return memorySlots;
   }
 }
@@ -40,7 +42,8 @@ export async function createSlot(payload: Record<string, unknown>) {
     })
       .select(slotFields.join(" "))
       .lean();
-  } catch {
+  } catch (error) {
+    if (strictModeEnabled()) throw error;
     const localSlot = {
       ...sanitized,
       _id: `local-slot-${Date.now()}`,
@@ -55,7 +58,8 @@ export async function assignSlotCampaign(chainSlotId: string, assignedCampaignId
   try {
     await connectDatabase();
     return await SlotModel.findOneAndUpdate({ chainSlotId }, { assignedCampaignId }, { new: true }).select(slotFields.join(" ")).lean();
-  } catch {
+  } catch (error) {
+    if (strictModeEnabled()) throw error;
     const match = memorySlots.find((slot) => String((slot as { chainSlotId?: string }).chainSlotId ?? "") === chainSlotId) as
       | Record<string, unknown>
       | undefined;

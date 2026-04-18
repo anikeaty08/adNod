@@ -1,119 +1,189 @@
-# AdNode
+# AdNode — Confidential ad settlement on Fhenix
 
-AdNode is a decentralized advertising marketplace on the Fhenix-compatible Arbitrum Sepolia testnet. It connects:
+AdNode is a **hoster ↔ developer** ad stack where **campaign economics can stay confidential on-chain (Fhenix CoFHE)** while **payouts and pricing rules are enforceable in plain wei**. A small Next.js app, API, and three Solidity contracts work together so embed impressions/clicks can settle without the hoster or developer trusting a central payout server for arbitrary amounts.
 
-- Hosters: advertisers who fund campaigns
-- Developers: publishers who register slots and embed ads
+---
 
-The product loop is simple and live: fund campaign escrow, assign campaign to a slot, serve the slot snippet, measure delivery, settle on-chain, and move payouts through the confidential wrapper before unshielding back to native ETH.
+## What problem this solves
+
+| Pain | How AdNode approaches it |
+|------|---------------------------|
+| **Opaque or gameable payouts** | Settlement txs must match **on-chain terms** (`getSettlementTerms` + `reserveDeveloperPayout` CPC/CPM checks). |
+| **Leaking budget & bids** | Budget and CPC are **`euint64` / `euint32`** encrypted fields using **Fhenix `FHE.sol`** (CoFHE), with hoster-controlled `FHE.allow` visibility. |
+| **Creative hosting** | Creatives are referenced by **URI** (commonly `ipfs://…` served via a gateway). The chain does not need to store media bytes. |
+| **Sybil / spoofing** | API hardening (signed replay, measurement fingerprinting, rate limits) — **defense in depth**, not a silver bullet. |
+
+**Fhenix / CoFHE (from [Fhenix documentation](https://cofhe-docs.fhenix.zone))** — *Co-processor for Fully Homomorphic Encryption*: smart contracts use **`FHE.sol`** for operations on encrypted types; the broader system includes task routing, ciphertext registry, and **threshold decryption** so plaintext only emerges under defined rules. AdNode uses that model for **confidential campaign fields** while keeping **settlement math auditable** where enforcement requires it.
+
+Research context: Fhenix’s [research overview](https://cofhe-docs.fhenix.zone/deep-dive/research/research-in-fhenix) describes threshold FHE decryption and performance work — your app benefits from that stack when running on a supported Fhenix network with CoFHE enabled.
+
+---
+
+
+
+## Architecture — Hoster vs developer
+
+### Hoster flow (campaign owner)
+
+```mermaid
+flowchart LR
+  subgraph Hoster["Hoster"]
+    H1[Wallet on Arbitrum Sepolia]
+    H2[Create campaign FHE inputs + settlement terms]
+    H3[Fund with native ETH]
+    H4[Pause / withdraw unspent when inactive]
+  end
+  subgraph Chain["On-chain"]
+    AR[(AdRegistry)]
+    AA[(AdAnalytics)]
+  end
+  subgraph Offchain["Off-chain"]
+    API[AdNode API + DB metadata]
+    IPFS[(Creative URI / IPFS gateway)]
+  end
+  H1 --> H2 --> AR
+  H2 --> IPFS
+  AR --> H3
+  API -->|metadata, embed| IPFS
+  AA -->|authorized settlement| AR
+  H4 --> AR
+```
+
+### Developer flow (slot owner)
+
+```mermaid
+flowchart LR
+  subgraph Developer["Developer"]
+    D1[Wallet on Arbitrum Sepolia]
+    D2[Register slot + category]
+    D3[Assign approved campaign]
+    D4[Claim earnings]
+  end
+  subgraph Chain["On-chain"]
+    AR[(AdRegistry)]
+    PW[(AdNodePayoutWrapper)]
+  end
+  subgraph Offchain["Off-chain"]
+    EMB[Embed /measure]
+    API[API + settlement service]
+  end
+  D1 --> D2 --> AR
+  D3 --> AR
+  EMB -->|impression/click| API
+  API -->|creditDeveloperEarnings| AR
+  AR -->|claimable balance| D4
+  D4 --> PW
+```
+
+### End-to-end (product + Fhenix)
+
+```mermaid
+flowchart TD
+  FE[Next.js + RainbowKit / Wagmi]
+  API[Express + serverless routes]
+  DB[(MongoDB metadata)]
+  CH[Arbitrum Sepolia + CoFHE]
+  FE <-->|reads/writes contracts| CH
+  FE <-->|signed requests| API
+  API <-->|campaign/slot/measures| DB
+  API -->|settlement| CH
+  CH --> PW[PayoutWrapper FHERC20 path]
+```
+
+---
+
+## Repository layout (main files)
+
+| Area | Path | Role |
+|------|------|------|
+| **Contracts** | `contracts/AdRegistry.sol` | Campaigns, slots, FHE budget/CPC, settlement enforcement, claims |
+| | `contracts/AdAnalytics.sol` | Analytics / settlement manager hooks |
+| | `contracts/AdNodePayoutWrapper.sol` | Confidential payout wrapper (FHERC20 native wrapper) |
+| **Deploy** | `scripts/deploy.cjs` | Deploy all three; write `deployments/<network>.json` + ABIs |
+| | `deployments/fhenixArbitrumSepolia.json` | **Default** app deployment (Arbitrum Sepolia) |
+| | `deployments/fhenixHelium.json` | Helium addresses (optional network) |
+| | `hardhat.config.cjs` | `fhenixArbitrumSepolia` + `fhenixHelium` networks |
+| **Frontend** | `app/` | Next.js App Router: `/` (workflow), `/app` (advertiser + publisher tabs), `/app/account` (wallet). Legacy `/app/host` & `/app/developer` redirect into `/app`. |
+| | `components/web3/` | Wagmi, RainbowKit, gates |
+| | `components/layout/nav.tsx` | Nav |
+| | `lib/wagmi.ts`, `lib/chain.ts`, `lib/contracts.ts` | Chain + contract addresses |
+| **Backend** | `server/index.ts` | Express API |
+| | `server/settlement-service.ts` | On-chain settlement calls |
+| | `server/public-campaigns.ts` | Embed HTML, creative resolution, SSRF guard |
+| | `server/measurement.ts`, `server/chain-state.ts` | Measures + viem client |
+| **Serverless** | `api/*.ts` | Vercel-style API parity |
+| **ABIs** | `lib/abi/*.json`, `src/lib/abi/*.json` | Shared ABIs for app + server |
+| **Docs** | `docs/ADNODE_ARCHITECTURE.md`, `docs/ADNODE_AUDIT_REPORT.md` | Deeper design / notes |
+| **Config** | `.env.example`, `next.config.mjs`, `tsconfig.json` | Env + build |
+
+---
 
 ## Stack
 
-- Frontend: React 18, Vite, TypeScript, Tailwind CSS, wouter
-- Wallets: wagmi, viem, WalletConnect v2
-- Privacy: CoFHE SDK on Fhenix-compatible testnet
-- Backend: Express + Vercel serverless handlers for metadata, embed delivery, and settlement measurement
-- Contracts: Solidity + Hardhat
-- Motion/UI: GSAP + Barba.js transition orchestration + lucide-react icons
+- **Frontend:** Next.js 14, TypeScript, RainbowKit + Wagmi + Viem, CSS modules, Framer Motion, Recharts (Account charts), Zustand
+- **Wallet:** WalletConnect via RainbowKit `projectId`
+- **Chain (default):** Arbitrum Sepolia **421614**; optional Fhenix Helium **8008135** via `NEXT_PUBLIC_ADNODE_NETWORK=fhenixHelium` + matching RPC/ABIs
+- **Confidentiality:** `@fhenixprotocol/cofhe-contracts` / `FHE.sol`, `@cofhe/sdk` where used
+- **Backend:** Express, MongoDB (metadata), signed auth for sensitive routes
 
-## WalletConnect v2
-
-WalletConnect v2 is the only wallet connection path in the app.
-
-What it supports:
-
-- WalletConnect QR modal
-- Fhenix-compatible Arbitrum Sepolia testnet
-- Connected address display
-- Disconnect
-- Auto reconnect via wagmi storage
-- Wrong-network handling
-- Connection error messaging
-- CoFHE compatibility by reusing the active wagmi wallet client for encrypted flows
+---
 
 ## Environment
 
-Create `.env` from `.env.example` and set:
+Copy `.env.example` → `.env`. Minimum for the app:
 
-```env
-VITE_CHAIN_ID=421614
-VITE_FHENIX_RPC_URL=https://sepolia-rollup.arbitrum.io/rpc
-VITE_WALLETCONNECT_PROJECT_ID=your_project_id
-VITE_ADREGISTRY_ADDRESS=your_registry_address
-VITE_ADANALYTICS_ADDRESS=your_analytics_address
-VITE_API_URL=http://127.0.0.1:4000
-MONGO_URI=your_mongo_uri
-PRIVATE_KEY=your_deployer_key
-SETTLEMENT_PRIVATE_KEY=server_side_settlement_signer
-ADNODE_EMBED_SECRET=server_side_secret
-ADNODE_SETTLEMENT_REPLAY_INTERVAL_MS=60000
-WRAPPED_NATIVE_TOKEN_ADDRESS=network_wrapped_native_token
+- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
+- `NEXT_PUBLIC_AD_REGISTRY_ADDRESS`, `NEXT_PUBLIC_AD_ANALYTICS_ADDRESS`, `NEXT_PUBLIC_PAYOUT_WRAPPER_ADDRESS`  
+  (defaults fall back to `deployments/fhenixArbitrumSepolia.json`)
+- `VITE_CHAIN_ID` / `NEXT_PUBLIC_CHAIN_ID` — default **421614**
+- `NEXT_PUBLIC_RPC_URL` or `VITE_FHENIX_RPC_URL` — e.g. `https://sepolia-rollup.arbitrum.io/rpc`
+- `VITE_ADREGISTRY_ADDRESS`, `VITE_ADANALYTICS_ADDRESS` — **same** registry/analytics for the API server
+- `ADNODE_EMBED_SECRET`, optional `ADNODE_STRICT_MODE`, Mongo URI, Pinata keys if you upload creatives via API
+
+---
+
+## Deploy contracts
+
+**Arbitrum Sepolia (default app target)** — Hardhat network `fhenixArbitrumSepolia` in `hardhat.config.cjs`:
+
+1. Set `PRIVATE_KEY`, `WRAPPED_NATIVE_TOKEN_ADDRESS`, and `VITE_FHENIX_RPC_URL` (or `ARBITRUM_SEPOLIA_RPC_URL`) to a working Arbitrum Sepolia RPC.
+2. Run:
+
+```bash
+npx hardhat run scripts/deploy.cjs --network fhenixArbitrumSepolia
 ```
 
-`SETTLEMENT_PRIVATE_KEY` and `ADNODE_EMBED_SECRET` must stay server-side only.
+This writes **`deployments/fhenixArbitrumSepolia.json`** and refreshes **`src/lib/abi/*.json`**.
 
-## User Flows
+**Fhenix Helium** — use `npm run deploy:helium` (network `fhenixHelium`, writes `deployments/fhenixHelium.json`). Then set `NEXT_PUBLIC_ADNODE_NETWORK=fhenixHelium` and matching env addresses.
 
-### Hoster
+---
 
-- Connect through WalletConnect on Arbitrum Sepolia
-- Create a campaign with creative, category, pricing model, rate, and escrow funding
-- Review escrow totals and activate or pause campaigns
-- Let developers attach the campaign to registered slots
+## Settlement rules (summary)
 
-### Developer
+- `createCampaign` requires **settlement pricing model** (CPC / CPM) and **`settlementRateWei`**.
+- `reserveDeveloperPayout` enforces **exact CPC amount** or **CPM multiples** within bounds.
+- **`getSettlementTerms`** is used to preflight off-chain settlement before crediting earnings.
+- Breaking ABI changes require **redeploy** and new campaigns.
 
-- Connect through WalletConnect on Arbitrum Sepolia
-- Register a slot and save public site metadata
-- Assign a funded campaign to that slot
-- Copy the generated slot snippet into a site or app
-- Decrypt earnings, claim into the confidential wrapper, then unshield back to native ETH
+---
 
-## Measurement and Settlement
+## Product routes
 
-- Embed frames receive a signed measurement token tied to a specific slot and campaign assignment
-- `/api/measure` records impressions and clicks, deduplicates them, and immediately attempts settlement on-chain
-- If RPC or signer issues interrupt settlement, the measurement stays pending instead of being lost
-- Pending writes can be replayed through `POST /api/settlement/replay` or automatically with `ADNODE_SETTLEMENT_REPLAY_INTERVAL_MS`
-- Payout credits flow from escrow into the FHERC20 native wrapper and are unshielded back to ETH when the developer finalizes the claim
+- **`/app/account`** — Hoster campaigns + developer slots, Recharts snapshots, **`claimMyEarnings`**
+- **`/app/portfolio`** — redirects to **`/app/account`**
+- **`/docs`** — In-app documentation
 
-## Running The App
+---
 
-```powershell
-npm.cmd install
-npm.cmd run dev:api
-npm.cmd run dev
-```
+## Further reading
 
-## Production Notes
+- [CoFHE architecture overview](https://cofhe-docs.fhenix.zone/deep-dive/cofhe-components/overview)
+- [FHE library quick start](https://cofhe-docs.fhenix.zone/fhe-library/introduction/quick-start)
+- [Research in Fhenix](https://cofhe-docs.fhenix.zone/deep-dive/research/research-in-fhenix)
 
-- Ad serving is slot-based, not campaign-id based
-- Wallet-gated flows stay intact for CoFHE encryption and decryption
-- Campaign metadata writes are signed and checked against chain ownership
-- Developer payouts are claimable only after funded settlement is recorded
-- Settlement uses explicit analytics and earnings roles instead of broad owner-only control
-- The frontend expects WalletConnect and the Fhenix-compatible Arbitrum Sepolia RPC to point at the same deployment
+---
 
-## Repo Docs
+## License
 
-- [Architecture](docs/ADNODE_ARCHITECTURE.md)
-- [Docs Page Source](src/pages/Docs.tsx)
-
-## Commands
-
-```powershell
-npx.cmd hardhat compile
-npm.cmd run build
-npx.cmd hardhat run scripts/deploy.cjs --network fhenixArbitrumSepolia
-```
-
-## Key Files
-
-- [src/lib/contract-client.ts](src/lib/contract-client.ts)
-- [src/context/WalletContext.tsx](src/context/WalletContext.tsx)
-- [src/components/shared/WalletConnectionModal.tsx](src/components/shared/WalletConnectionModal.tsx)
-- [src/pages/Docs.tsx](src/pages/Docs.tsx)
-- [server/settlement-service.ts](server/settlement-service.ts)
-- [server/public-campaigns.ts](server/public-campaigns.ts)
-- [contracts/AdRegistry.sol](contracts/AdRegistry.sol)
-- [contracts/AdAnalytics.sol](contracts/AdAnalytics.sol)
+See contract SPDX headers and project `package.json` (private by default).
