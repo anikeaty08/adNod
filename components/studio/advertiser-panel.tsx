@@ -145,6 +145,7 @@ export function AdvertiserPanel() {
   const [initialFundEth, setInitialFundEth] = useState(SAMPLE_CAMPAIGN.initialFundEth);
   const [busy, setBusy] = useState("");
   const [newCampaignId, setNewCampaignId] = useState<string | null>(null);
+  const [existingCampaignId, setExistingCampaignId] = useState("");
 
   const uploadCreative = useCallback(
     async (file: File) => {
@@ -342,6 +343,31 @@ export function AdvertiserPanel() {
     });
   }, [address, newCampaignId, title, description, creativeUri, category, pricingModel, rate, overlay, signMessageAsync]);
 
+  const syncExisting = useCallback(async () => {
+    if (!address) throw new Error("Connect wallet first.");
+    const id = existingCampaignId.trim();
+    if (!id) throw new Error("Enter an existing campaign id.");
+    await overlay.withLoading(async () => {
+      await signedPostJson(
+        "/api/campaigns",
+        "campaigns:create",
+        {
+          chainCampaignId: id,
+          title,
+          description,
+          creativeURI: creativeUri,
+          category,
+          pricingModel,
+          rate,
+          advertiser: address,
+        },
+        signMessageAsync,
+        address,
+      );
+      setBusy(`Synced campaign #${id} to API.`);
+    });
+  }, [address, existingCampaignId, title, description, creativeUri, category, pricingModel, rate, overlay, signMessageAsync]);
+
   if (!CONTRACTS_CONFIGURED) {
     return (
       <GlassPanel className="p-5">
@@ -460,6 +486,18 @@ export function AdvertiserPanel() {
           </PrimaryButton>
         </GlassPanel>
       ) : null}
+
+      <GlassPanel className="p-5 md:p-6">
+        <p className="text-sm text-muted">Already created on-chain? Sync any campaign id to the API:</p>
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <Field label="Existing campaign id">
+            <TextInput value={existingCampaignId} onChange={(e) => setExistingCampaignId(e.target.value)} placeholder="2" />
+          </Field>
+          <PrimaryButton disabled={!!busy || !address || !existingCampaignId.trim()} onClick={() => void syncExisting().catch((e) => setBusy(e instanceof Error ? e.message : "Sync failed"))}>
+            Sync existing id
+          </PrimaryButton>
+        </div>
+      </GlassPanel>
     </div>
   );
 }

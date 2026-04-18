@@ -268,20 +268,16 @@ app.post("/api/settlement/replay", rateLimit(15, "replay"), async (req, res) => 
 });
 
 app.post("/api/campaigns", async (req, res) => {
-  const candidate = sanitizeCampaignMetadata(req.body as Record<string, unknown>);
   let signerAddress = "";
 
   try {
-    signerAddress = await assertSignedRequest(req.headers, "campaigns:create", candidate);
+    signerAddress = await assertSignedRequest(req.headers, "campaigns:create", (req.body as Record<string, unknown>) ?? {});
   } catch (error) {
     res.status(401).json({ error: error instanceof Error ? error.message : "Unauthorized request." });
     return;
   }
 
-  const payload = sanitizeCampaignMetadata({
-    ...candidate,
-    advertiser: signerAddress,
-  });
+  const payload = sanitizeCampaignMetadata({ ...(req.body as Record<string, unknown>), advertiser: signerAddress });
 
   try {
     const onchainHoster = await getCampaignHoster(payload.chainCampaignId);
@@ -298,20 +294,16 @@ app.post("/api/campaigns", async (req, res) => {
 });
 
 app.post("/api/slots", async (req, res) => {
-  const candidate = sanitizeSlotMetadata(req.body as Record<string, unknown>);
   let signerAddress = "";
 
   try {
-    signerAddress = await assertSignedRequest(req.headers, "slots:create", candidate);
+    signerAddress = await assertSignedRequest(req.headers, "slots:create", (req.body as Record<string, unknown>) ?? {});
   } catch (error) {
     res.status(401).json({ error: error instanceof Error ? error.message : "Unauthorized request." });
     return;
   }
 
-  const payload = sanitizeSlotMetadata({
-    ...candidate,
-    developer: signerAddress,
-  });
+  const payload = sanitizeSlotMetadata({ ...(req.body as Record<string, unknown>), developer: signerAddress });
 
   try {
     const onchainDeveloper = await getSlotDeveloper(payload.chainSlotId);

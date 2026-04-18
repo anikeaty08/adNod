@@ -71,22 +71,14 @@ async function handleCampaigns(req: IncomingMessage, res: ServerResponse) {
     return sendJson(res, 400, { error: error instanceof Error ? error.message : "Invalid request body." });
   }
 
-  const candidate = sanitizeCampaignMetadata({
-    ...payload,
-    advertiser: String(payload.advertiser ?? ""),
-  });
-
   let signerAddress = "";
   try {
-    signerAddress = await assertSignedRequest(req.headers, "campaigns:create", candidate);
+    signerAddress = await assertSignedRequest(req.headers, "campaigns:create", payload);
   } catch (error) {
     return sendJson(res, 401, { error: error instanceof Error ? error.message : "Unauthorized request." });
   }
 
-  const sanitized = sanitizeCampaignMetadata({
-    ...candidate,
-    advertiser: signerAddress,
-  });
+  const sanitized = sanitizeCampaignMetadata({ ...payload, advertiser: signerAddress });
 
   try {
     const onchainHoster = await getCampaignHoster(sanitized.chainCampaignId);
@@ -127,22 +119,14 @@ async function handleSlots(req: IncomingMessage, res: ServerResponse) {
     return sendJson(res, 400, { error: error instanceof Error ? error.message : "Invalid request body." });
   }
 
-  const candidate = sanitizeSlotMetadata({
-    ...body,
-    developer: String(body.developer ?? ""),
-  });
-
   let signerAddress = "";
   try {
-    signerAddress = await assertSignedRequest(req.headers, "slots:create", candidate);
+    signerAddress = await assertSignedRequest(req.headers, "slots:create", body);
   } catch (error) {
     return sendJson(res, 401, { error: error instanceof Error ? error.message : "Unauthorized request." });
   }
 
-  const sanitized = sanitizeSlotMetadata({
-    ...candidate,
-    developer: signerAddress,
-  });
+  const sanitized = sanitizeSlotMetadata({ ...body, developer: signerAddress });
 
   try {
     const onchainDeveloper = await getSlotDeveloper(sanitized.chainSlotId);
@@ -402,4 +386,3 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return sendJson(res, 500, { error: error instanceof Error ? error.message : "Server error" });
   }
 }
-
