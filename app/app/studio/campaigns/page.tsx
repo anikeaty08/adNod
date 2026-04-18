@@ -125,33 +125,30 @@ export default function StudioCampaignsPage() {
           return 0;
       }
     });
+
     return list;
   }, [rows, search, category, pricing, advertiserScope, address, sort]);
 
   return (
-    <div>
-      <header className="mb-6">
-        <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--text)] md:text-3xl">Your campaigns</h1>
-        <p className="mt-1 text-sm text-muted">Filter and sort API metadata. Chain ids link to detail when available.</p>
-      </header>
+    <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+      <div>
+        <header className="mb-4">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--text)] md:text-3xl">Your campaigns</h1>
+          <p className="mt-1 text-sm text-muted">Browse and filter campaigns.</p>
+        </header>
 
-      <GlassPanel className="mb-6 space-y-4 p-4 md:p-5">
-        <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-[var(--text)]">
-          <Filter size={16} className="text-muted" />
-          Filters & sort
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <GlassPanel className="space-y-4 p-4 md:p-5 lg:sticky lg:top-24">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-[var(--text)]">
+            <Filter size={16} className="text-muted" /> Filters
+          </div>
+
           <Field label="Search">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-              <TextInput
-                className="pl-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Title, description, id, category…"
-              />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+              <TextInput className="pl-11" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search title, id, category…" />
             </div>
           </Field>
+
           <Field label="Category">
             <Select value={category} onChange={(e) => setCategory(e.target.value)}>
               {categories.map((c) => (
@@ -161,71 +158,80 @@ export default function StudioCampaignsPage() {
               ))}
             </Select>
           </Field>
-          <Field label="Pricing model">
-            <Select value={pricing} onChange={(e) => setPricing(e.target.value as PricingFilter)}>
-              <option value="all">All</option>
-              <option value="CPC">CPC only</option>
-              <option value="CPM">CPM only</option>
-            </Select>
-          </Field>
-          <Field label="Advertiser scope">
-            <Select value={advertiserScope} onChange={(e) => setAdvertiserScope(e.target.value as "mine" | "all")}>
-              <option value="mine">My wallet only</option>
-              <option value="all">Everyone (browse)</option>
-            </Select>
-          </Field>
-          <Field label="Sort by">
-            <Select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
-              <option value="newest">Time · Newest first</option>
-              <option value="oldest">Time · Oldest first</option>
-              <option value="title_az">Title · A → Z</option>
-              <option value="title_za">Title · Z → A</option>
-              <option value="category_az">Category · A → Z</option>
-              <option value="rate_high">Public rate · High → Low</option>
-              <option value="rate_low">Public rate · Low → High</option>
-            </Select>
-          </Field>
-        </div>
-        <p className="text-xs text-muted">
-          Showing <strong className="text-[var(--text)]">{filtered.length}</strong> of {rows.length} loaded.
-        </p>
-      </GlassPanel>
 
-      {loadErr ? <p className="mb-4 text-sm text-amber-300">{loadErr}</p> : null}
+          <details className="rounded-panel border border-border p-3">
+            <summary className="cursor-pointer text-sm font-medium text-[var(--text)]">More filters</summary>
+            <div className="mt-3 grid gap-4">
+              <Field label="Pricing model">
+                <Select value={pricing} onChange={(e) => setPricing(e.target.value as PricingFilter)}>
+                  <option value="all">All</option>
+                  <option value="CPC">CPC only</option>
+                  <option value="CPM">CPM only</option>
+                </Select>
+              </Field>
+              <Field label="Advertiser scope">
+                <Select value={advertiserScope} onChange={(e) => setAdvertiserScope(e.target.value as "mine" | "all")}>
+                  <option value="mine">My wallet only</option>
+                  <option value="all">Everyone (browse)</option>
+                </Select>
+              </Field>
+              <Field label="Sort by">
+                <Select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="title_az">Title A → Z</option>
+                  <option value="title_za">Title Z → A</option>
+                  <option value="category_az">Category A → Z</option>
+                  <option value="rate_high">Rate high → low</option>
+                  <option value="rate_low">Rate low → high</option>
+                </Select>
+              </Field>
+            </div>
+          </details>
 
-      {!address && advertiserScope === "mine" ? (
-        <GlassPanel className="p-6 text-sm text-muted">Connect your wallet to list campaigns for your address.</GlassPanel>
-      ) : filtered.length === 0 ? (
-        <GlassPanel className="p-6 text-sm text-muted">No campaigns match these filters.</GlassPanel>
-      ) : (
-        <ul className="space-y-2">
-          {filtered.map((r) => (
-            <li key={String(r.chainCampaignId)}>
-              <Link
-                href={`/app/studio/campaigns/${encodeURIComponent(
-                  `${String(r.chainCampaignId ?? "")}-${slugify(String(r.title ?? "")) || "campaign"}`,
-                )}`}
-                className="block cursor-pointer rounded-xl border border-border bg-[color-mix(in_srgb,var(--surface-solid)_95%,transparent)] p-4 transition hover:border-accent/50 hover:bg-[color-mix(in_srgb,var(--accent)_8%,var(--surface-solid))]"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="font-mono text-xs text-muted">#{r.chainCampaignId}</p>
-                    <p className="font-display text-lg font-semibold text-[var(--text)]">
-                      {displayCampaignTitle({ title: r.title ?? null, chainCampaignId: r.chainCampaignId ?? null })}
-                    </p>
-                    <p className="mt-1 text-sm text-muted">
-                      {r.category ?? "—"} · {r.pricingModel ?? "—"} · rate {r.rate ?? "—"}
-                    </p>
+          <p className="text-xs text-muted">
+            Showing <strong className="text-[var(--text)]">{filtered.length}</strong> of {rows.length}.
+          </p>
+        </GlassPanel>
+      </div>
+
+      <div className="min-w-0">
+        {loadErr ? <p className="mb-4 text-sm text-amber-300">{loadErr}</p> : null}
+
+        {!address && advertiserScope === "mine" ? (
+          <GlassPanel className="p-6 text-sm text-muted">Connect your wallet to list campaigns for your address.</GlassPanel>
+        ) : filtered.length === 0 ? (
+          <GlassPanel className="p-6 text-sm text-muted">No campaigns match these filters.</GlassPanel>
+        ) : (
+          <ul className="space-y-2">
+            {filtered.map((r) => (
+              <li key={String(r.chainCampaignId)}>
+                <Link
+                  href={`/app/studio/campaigns/${encodeURIComponent(`${String(r.chainCampaignId ?? "")}-${slugify(String(r.title ?? "")) || "campaign"}`)}`}
+                  className="block rounded-xl border border-border bg-[color-mix(in_srgb,var(--surface-solid)_95%,transparent)] p-4 transition hover:border-accent/50 hover:bg-[color-mix(in_srgb,var(--accent)_8%,var(--surface-solid))]"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="font-mono text-xs text-muted">#{r.chainCampaignId}</p>
+                      <p className="font-display text-lg font-semibold text-[var(--text)]">
+                        {displayCampaignTitle({ title: r.title ?? null, chainCampaignId: r.chainCampaignId ?? null })}
+                      </p>
+                      <p className="mt-1 text-sm text-muted">
+                        {r.category ?? "—"} · {r.pricingModel ?? "—"} · rate {r.rate ?? "—"}
+                      </p>
+                    </div>
+                    <div className="text-right text-xs text-muted">
+                      <span suppressHydrationWarning>
+                        {hydrated && r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-right text-xs text-muted">
-                    <span suppressHydrationWarning>{hydrated && r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}</span>
-                  </div>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

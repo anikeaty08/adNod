@@ -12,14 +12,10 @@ import { AdNodeLogo } from "@/components/brand/adnode-logo";
 import { HoverFlipText } from "@/components/ui/hover-flip-text";
 
 const studioLinks: readonly { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/", label: "Home", icon: Home },
   { href: "/app/studio", label: "Studio", icon: Clapperboard },
   { href: "/app/studio/create", label: "New campaign", icon: PlusCircle },
   { href: "/app/studio/campaigns", label: "Your campaigns", icon: LayoutGrid },
-] as const;
-
-const studioRootLinks: readonly { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/app/studio", label: "Studio", icon: Clapperboard },
 ] as const;
 
 const publisherStudioLinks: readonly { href: string; label: string; icon: LucideIcon }[] = [
@@ -59,14 +55,7 @@ export function Nav() {
   const ok = chainId === ADNODE_CHAIN_ID;
   const studioMode = pathname?.startsWith("/app/studio") ?? false;
   const publisherStudioMode = pathname?.startsWith("/app/studio/publisher") ?? false;
-  const studioRootMode = pathname === "/app/studio";
-  const links = studioMode
-    ? publisherStudioMode
-      ? publisherStudioLinks
-      : studioRootMode
-        ? studioRootLinks
-        : studioLinks
-    : browseLinks;
+  const links = studioMode ? (publisherStudioMode ? publisherStudioLinks : studioLinks) : browseLinks;
   const mode = studioMode ? "studio" : "browse";
 
   return (

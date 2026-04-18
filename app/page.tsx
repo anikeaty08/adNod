@@ -85,7 +85,7 @@ export default function LandingPage() {
         <section id="workflow" className="scroll-mt-24">
           <h2 className="font-display text-2xl font-bold text-[var(--text)] md:text-3xl">How teams use it</h2>
           <p className="mt-2 max-w-2xl text-sm text-muted md:text-base">
-            Two roles, two journeys â€” same chain and API. Connect wallet, pick your path, ship.
+            Two roles, two journeys — same chain and API. Connect wallet, pick your path, ship.
           </p>
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             <GlassPanel className="p-6 md:p-8">
@@ -122,7 +122,7 @@ export default function LandingPage() {
               <p className="mt-1 text-sm text-muted">Pulled from the AdNode API metadata store.</p>
             </div>
             <Link href="/docs" className="cursor-pointer text-sm text-accent hover:underline">
-              Read docs â†’
+              Read docs →
             </Link>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -137,7 +137,7 @@ export default function LandingPage() {
                     <p className="mt-1 font-display text-lg font-semibold text-[var(--text)]">
                       {displayCampaignTitle({ title: c.title ?? null, chainCampaignId: c.chainCampaignId ?? null })}
                     </p>
-                    <p className="mt-1 text-sm text-muted">{c.category ?? "â€”"} Â· {c.pricingModel ?? "â€”"}</p>
+                    <p className="mt-1 text-sm text-muted">{c.category ?? "—"} · {c.pricingModel ?? "—"}</p>
                   </GlassPanel>
               ))
             )}

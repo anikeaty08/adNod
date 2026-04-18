@@ -252,7 +252,7 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
           </p>
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <Field label="Assign campaign id" hint="This is on-chain; no manual sync needed.">
+            <Field label="Assign campaign id" hint="Enter a campaign id that matches your category.">
               <TextInput value={assignCampaignId} onChange={(e) => setAssignCampaignId(e.target.value)} placeholder="1" />
             </Field>
             <div className="flex items-end">
