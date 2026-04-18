@@ -48,7 +48,7 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
   const [siteName, setSiteName] = useState("");
   const [category, setCategory] = useState("");
   const [siteUrl, setSiteUrl] = useState("");
-  const [traffic, setTraffic] = useState("1000");
+  const [traffic, setTraffic] = useState("");
   const [selectedSlot, setSelectedSlot] = useState<SlotRow | null>(null);
   const [assignCampaignId, setAssignCampaignId] = useState("");
   const [busy, setBusy] = useState("");
@@ -92,9 +92,7 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
 
   useEffect(() => {
     setOrigin(window.location.origin);
-    if (!siteUrl) setSiteUrl(window.location.origin);
-    if (!siteName) setSiteName(window.location.hostname.replace(/^www\./, ""));
-  }, [siteName, siteUrl]);
+  }, []);
 
   const visibleCampaigns = useMemo(() => campaigns, [campaigns]);
 
@@ -238,10 +236,10 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted">New placement</p>
               <Field label="Placement name" hint="A label for you (eg. homepage-top).">
-                <TextInput value={siteName} onChange={(e) => setSiteName(e.target.value)} />
+                <TextInput value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="homepage-top" />
               </Field>
               <Field label="Category" hint="Optional for now; it helps organize placements.">
-                <TextInput value={category} onChange={(e) => setCategory(e.target.value)} placeholder="news" list="adnode-category" />
+                <TextInput value={category} onChange={(e) => setCategory(e.target.value)} placeholder="general" list="adnode-category" />
               </Field>
               <datalist id="adnode-category">
                 <option value="news" />
@@ -254,10 +252,10 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
                 <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-muted">Advanced</summary>
                 <div className="mt-3 grid gap-3">
                   <Field label="Site URL (metadata)">
-                    <TextInput value={siteUrl} onChange={(e) => setSiteUrl(e.target.value)} />
+                    <TextInput value={siteUrl} onChange={(e) => setSiteUrl(e.target.value)} placeholder="https://example.com" />
                   </Field>
                   <Field label="Traffic / day (metadata)">
-                    <TextInput value={traffic} onChange={(e) => setTraffic(e.target.value)} />
+                    <TextInput value={traffic} onChange={(e) => setTraffic(e.target.value)} placeholder="1000" />
                   </Field>
                 </div>
               </details>
