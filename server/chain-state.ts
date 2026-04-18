@@ -11,8 +11,10 @@ export type RegistryChainHealth = {
 };
 
 const chainId = getConfiguredChainId();
-const adRegistryAddress = process.env.VITE_ADREGISTRY_ADDRESS as `0x${string}` | undefined;
-const adAnalyticsAddress = process.env.VITE_ADANALYTICS_ADDRESS as `0x${string}` | undefined;
+const adRegistryAddress = (process.env.VITE_ADREGISTRY_ADDRESS ||
+  process.env.NEXT_PUBLIC_AD_REGISTRY_ADDRESS) as `0x${string}` | undefined;
+const adAnalyticsAddress = (process.env.VITE_ADANALYTICS_ADDRESS ||
+  process.env.NEXT_PUBLIC_AD_ANALYTICS_ADDRESS) as `0x${string}` | undefined;
 
 const rpcUrl =
   process.env.VITE_FHENIX_RPC_URL ||

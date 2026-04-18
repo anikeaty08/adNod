@@ -3,7 +3,7 @@ import "dotenv/config";
 import { getCampaignByChainId, getCampaigns, createCampaign, createCampaignIfAbsent, sanitizeCampaignMetadata } from "../server/campaign-store.js";
 import { getSlots, createSlot, sanitizeSlotMetadata, assignSlotCampaign } from "../server/slot-store.js";
 import { getDatabaseReady } from "../server/campaign-store.js";
-import { getRegistryChainHealth, getCampaignHoster, getSlotDeveloper, getAssignedCampaignId, getNextCampaignId, getCampaignPublicInfo, getCampaignSettlementTerms } from "../server/chain-state.js";
+import { getRegistryChainHealth, getCampaignHoster, getSlotDeveloper, getAssignedCampaignId, getNextCampaignId, getCampaignPublicInfo, getCampaignSettlementTerms, adRegistryAddress, adAnalyticsAddress } from "../server/chain-state.js";
 import { assertSignedRequest } from "../server/request-auth.js";
 import { readJsonBody } from "../server/http-body.js";
 import { parseMultipartUpload, uploadBufferToPinata } from "../server/pinata.js";
@@ -359,7 +359,14 @@ async function handleMeasure(req: IncomingMessage, res: ServerResponse) {
 async function handleHealth(_req: IncomingMessage, res: ServerResponse) {
   const databaseReady = await getDatabaseReady();
   const chain = await getRegistryChainHealth();
-  return sendJson(res, 200, { ok: true, service: "adnode-api", databaseReady, ...chain });
+  return sendJson(res, 200, {
+    ok: true,
+    service: "adnode-api",
+    databaseReady,
+    registryAddress: adRegistryAddress ?? null,
+    analyticsAddress: adAnalyticsAddress ?? null,
+    ...chain,
+  });
 }
 
 async function handleUploadCreative(req: IncomingMessage, res: ServerResponse) {
