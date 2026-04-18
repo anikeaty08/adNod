@@ -40,7 +40,7 @@ export default function LandingPage() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-muted">Why we&apos;re building AdNode</p>
             <h1 className="font-display mt-4 text-4xl font-bold leading-[1.08] tracking-tight text-[var(--text)] md:text-5xl lg:text-[3.25rem]">
-              Ads that settle fairly â€” without broadcasting your whole playbook.
+              Fair settlement without exposing your strategy.
             </h1>
             <p className="mt-6 max-w-xl text-base leading-relaxed text-muted md:text-lg">
               Programmatic placements are stuck between opaque ad networks and fully public on-chain auctions. AdNode is a middle path:
@@ -76,7 +76,7 @@ export default function LandingPage() {
               <Sparkles className="text-accent" size={26} strokeWidth={1.5} />
               <h3 className="font-display mt-3 text-lg font-semibold text-[var(--text)]">Modern product surface</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted">
-                Long-scroll marketing, GitBook-style docs, floating help chat, and motion overlays for loading and payments â€” so the app feels as serious as the contracts underneath.
+                A clean Studio and Publisher flow with embeds that work on real sites.
               </p>
             </GlassPanel>
           </div>

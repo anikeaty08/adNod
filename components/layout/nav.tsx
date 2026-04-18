@@ -17,6 +17,11 @@ const studioLinks: readonly { href: string; label: string; icon: LucideIcon }[] 
   { href: "/app/studio/campaigns", label: "Your campaigns", icon: LayoutGrid },
 ] as const;
 
+const studioRootLinks: readonly { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/", label: "Home", icon: Home },
+  { href: "/app/studio", label: "Studio", icon: Clapperboard },
+] as const;
+
 const publisherStudioLinks: readonly { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/app/studio/publisher", label: "Home", icon: Home },
   { href: "/app/studio/publisher/slots", label: "Publisher slot", icon: LayoutTemplate },
@@ -27,7 +32,6 @@ const publisherStudioLinks: readonly { href: string; label: string; icon: Lucide
 const browseLinks: readonly { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/app/studio", label: "Studio", icon: Clapperboard },
-  { href: "/app/studio/publisher", label: "Publisher", icon: LayoutTemplate },
   { href: "/app/account", label: "Account", icon: Wallet },
   { href: "/docs", label: "Docs", icon: BookOpen },
 ] as const;
@@ -44,7 +48,6 @@ function linkActive(pathname: string | null, href: string, mode: "studio" | "bro
   }
 
   if (href === "/docs") return pathname === "/docs" || pathname.startsWith("/docs/");
-  if (href === "/app/studio/publisher") return pathname.startsWith("/app/studio/publisher");
   if (href === "/app/account") return pathname.startsWith("/app/account");
   if (href === "/app/studio") return pathname.startsWith("/app/studio");
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -56,7 +59,14 @@ export function Nav() {
   const ok = chainId === ADNODE_CHAIN_ID;
   const studioMode = pathname?.startsWith("/app/studio") ?? false;
   const publisherStudioMode = pathname?.startsWith("/app/studio/publisher") ?? false;
-  const links = studioMode ? (publisherStudioMode ? publisherStudioLinks : studioLinks) : browseLinks;
+  const studioRootMode = pathname === "/app/studio";
+  const links = studioMode
+    ? publisherStudioMode
+      ? publisherStudioLinks
+      : studioRootMode
+        ? studioRootLinks
+        : studioLinks
+    : browseLinks;
   const mode = studioMode ? "studio" : "browse";
 
   return (
