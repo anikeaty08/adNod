@@ -553,7 +553,7 @@ async function handleMeasure(req: IncomingMessage, res: ServerResponse) {
     return sendJson(res, 409, { error: "Embed token campaign assignment no longer matches slot state." });
   }
 
-  const remoteAddress = String(req.socket.remoteAddress ?? "");
+  const remoteAddress = String(req.socket?.remoteAddress ?? "");
   const userAgent = Array.isArray(req.headers["user-agent"]) ? req.headers["user-agent"][0] ?? "" : String(req.headers["user-agent"] ?? "");
   const fingerprint = buildMeasurementFingerprint({
     remoteAddress,
@@ -569,17 +569,42 @@ async function handleMeasure(req: IncomingMessage, res: ServerResponse) {
     fingerprint,
   });
 
-  const { duplicate, record } = await recordMeasurement({
-    eventKey,
-    chainCampaignId: campaign.id,
-    chainSlotId: campaign.slotId,
-    eventType,
-    pricingModel: campaign.pricingModel,
-    rate: campaign.rate,
-    pageUrl,
-    referrer,
-    fingerprint,
-  });
+  let duplicate = false;
+  let record: Awaited<ReturnType<typeof recordMeasurement>>["record"];
+  try {
+    const result = await recordMeasurement({
+      eventKey,
+      chainCampaignId: campaign.id,
+      chainSlotId: campaign.slotId,
+      eventType,
+      pricingModel: campaign.pricingModel,
+      rate: campaign.rate,
+      pageUrl,
+      referrer,
+      fingerprint,
+    });
+    duplicate = result.duplicate;
+    record = result.record;
+  } catch (error) {
+    // In strict-mode deployments, DB failures would otherwise cause a hard 500.
+    // Treat measurement as accepted and attempt chain sync; embeds should never crash the page.
+    duplicate = false;
+    record = {
+      eventKey,
+      chainCampaignId: campaign.id,
+      chainSlotId: campaign.slotId,
+      eventType: eventType as any,
+      pricingModel: campaign.pricingModel as any,
+      rate: campaign.rate,
+      pageUrl,
+      referrer,
+      fingerprint,
+      status: "accepted",
+      settlementTxHash: "",
+      lastError: error instanceof Error ? error.message : "Measurement store failed.",
+      settledAt: null,
+    } as any;
+  }
 
   if (duplicate) return sendJson(res, 202, { ok: true, duplicate: true });
 
@@ -587,7 +612,11 @@ async function handleMeasure(req: IncomingMessage, res: ServerResponse) {
     const result = await syncMeasurementToChain(record);
     return sendJson(res, 202, { ok: true, duplicate: false, settlement: result });
   } catch (error) {
-    await markMeasurementPending(record, error);
+    try {
+      await markMeasurementPending(record, error);
+    } catch {
+      // ignore
+    }
     return sendJson(res, 202, {
       ok: true,
       duplicate: false,

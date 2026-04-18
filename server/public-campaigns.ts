@@ -192,8 +192,8 @@ export function buildEmbedFrameHtml(
 
   const media =
     campaign.assetKind === "video"
-      ? `<video id="adnode-media" controls playsinline preload="metadata" style="width:100%;border-radius:18px;background:#020617" src="${assetUrl}"></video>`
-      : `<img id="adnode-media" alt="${title}" src="${assetUrl}" style="width:100%;display:block;border-radius:18px;object-fit:cover;background:#e0f2fe" />`;
+      ? `<video id="adnode-media" muted autoplay loop playsinline preload="metadata" style="width:100%;display:block;border-radius:16px;background:#0b1220" src="${assetUrl}"></video>`
+      : `<img id="adnode-media" alt="${title}" src="${assetUrl}" style="width:100%;display:block;border-radius:16px;object-fit:cover;background:#e2e8f0" />`;
 
   return `<!doctype html>
 <html lang="en">
@@ -206,72 +206,94 @@ export function buildEmbedFrameHtml(
       body {
         margin: 0;
         font-family: Inter, Arial, sans-serif;
-        background: linear-gradient(135deg, #f0f9ff 0%, #dbeafe 45%, #e0f2fe 100%);
+        background: transparent;
         color: #0f172a;
       }
-      .shell {
-        border: 1px solid rgba(255,255,255,0.65);
-        border-radius: 24px;
-        background: rgba(255,255,255,0.76);
-        backdrop-filter: blur(14px);
-        padding: 18px;
-      }
-      .badge {
-        display: inline-flex;
-        padding: 8px 12px;
-        border-radius: 999px;
-        background: rgba(14,165,233,0.12);
-        color: #0369a1;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-      }
-      h1 {
-        font-family: "Space Grotesk", Inter, Arial, sans-serif;
-        font-size: 24px;
-        margin: 14px 0 8px;
-      }
-      p {
-        margin: 0;
-        line-height: 1.6;
-      }
-      .meta {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        margin-top: 14px;
-        font-size: 12px;
-        color: #475569;
-      }
-      .cta {
-        display: inline-flex;
-        margin-top: 16px;
+      .wrap { padding: 0; }
+      .ad {
+        display: block;
         text-decoration: none;
-        color: white;
-        background: #0ea5e9;
-        border-radius: 999px;
-        padding: 12px 18px;
-        font-weight: 700;
+        border: 1px solid rgba(2,6,23,0.12);
+        border-radius: 18px;
+        background: rgba(255,255,255,0.9);
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(2,6,23,0.08);
       }
-      .wrap {
-        padding: 14px;
+      .top {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        padding: 10px 12px;
+        gap: 10px;
+        background: rgba(248,250,252,0.95);
+      }
+      .pill {
+        display:inline-flex;
+        align-items:center;
+        gap: 8px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color:#0f172a;
+      }
+      .pill b {
+        display:inline-flex;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: rgba(14,165,233,0.16);
+        color: #075985;
+      }
+      .hint {
+        font-size: 11px;
+        color: rgba(15,23,42,0.7);
+        white-space: nowrap;
+      }
+      .copy {
+        padding: 10px 12px 12px;
+      }
+      .headline {
+        font-family: "Space Grotesk", Inter, Arial, sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.25;
+        margin: 0;
+        color: #0f172a;
+      }
+      .sub {
+        margin: 6px 0 0;
+        font-size: 12px;
+        line-height: 1.45;
+        color: rgba(15,23,42,0.75);
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      @media (prefers-color-scheme: dark) {
+        .ad { background: rgba(2,6,23,0.65); border-color: rgba(148,163,184,0.18); }
+        .top { background: rgba(2,6,23,0.55); }
+        .pill { color: rgba(226,232,240,0.95); }
+        .pill b { background: rgba(56,189,248,0.16); color: rgba(186,230,253,0.95); }
+        .hint { color: rgba(226,232,240,0.65); }
+        .headline { color: rgba(226,232,240,0.95); }
+        .sub { color: rgba(226,232,240,0.7); }
       }
     </style>
   </head>
   <body>
     <div class="wrap">
-      <div class="shell">
-        <span class="badge">${category}</span>
-        <h1>${title}</h1>
-        <p>${description}</p>
-        <div style="margin-top:16px">${media}</div>
-        <div class="meta">
-          <span>AdNode public creative</span>
-          <span>${campaign.active ? "Active" : "Paused"}</span>
+      <a class="ad" id="adnode-root" href="#" aria-label="Sponsored ad">
+        <div class="top">
+          <span class="pill"><b>Ad</b> ${category}</span>
+          <span class="hint">Sponsored</span>
         </div>
-        <a class="cta" id="adnode-cta" href="#" role="button">Open creative</a>
-      </div>
+        <div style="padding: 0 12px 0">${media}</div>
+        <div class="copy">
+          <p class="headline">${title}</p>
+          <p class="sub">${description}</p>
+        </div>
+      </a>
     </div>
     <script>
       (function () {
@@ -279,6 +301,7 @@ export function buildEmbedFrameHtml(
         var endpoint = "${safeOrigin}/api/measure";
         var token = "${safeMeasurementToken}";
         var sentImpression = false;
+        var impressionTimer = null;
 
         function send(type) {
           var payload = JSON.stringify({
@@ -302,20 +325,33 @@ export function buildEmbedFrameHtml(
           }).catch(function () {});
         }
 
-        window.addEventListener("load", function () {
+        function scheduleImpression() {
           if (sentImpression) return;
-          sentImpression = true;
-          send("impression");
+          if (impressionTimer) return;
+          impressionTimer = setTimeout(function () {
+            if (sentImpression) return;
+            sentImpression = true;
+            send("impression");
+          }, 5000);
+        }
+
+        function cancelImpression() {
+          if (!impressionTimer) return;
+          clearTimeout(impressionTimer);
+          impressionTimer = null;
+        }
+
+        window.addEventListener("load", function () {
+          // Fallback: if the embed can't observe viewability, still send after 5s.
+          scheduleImpression();
         }, { once: true });
 
-        var cta = document.getElementById("adnode-cta");
-        if (cta) {
-          cta.addEventListener("click", function (e) {
+        var root = document.getElementById("adnode-root");
+        if (root) {
+          root.addEventListener("click", function (e) {
             e.preventDefault();
             send("click");
-            if (creativeUrl) {
-              window.open(creativeUrl, "_blank", "noreferrer");
-            }
+            if (creativeUrl) window.open(creativeUrl, "_blank", "noreferrer");
           });
         }
 
@@ -324,6 +360,21 @@ export function buildEmbedFrameHtml(
           media.addEventListener("click", function () {
             send("click");
           });
+        }
+
+        if ("IntersectionObserver" in window && root) {
+          try {
+            var obs = new IntersectionObserver(function (entries) {
+              var e = entries && entries[0];
+              if (!e) return;
+              if (e.isIntersecting && e.intersectionRatio >= 0.6) {
+                scheduleImpression();
+              } else {
+                cancelImpression();
+              }
+            }, { threshold: [0, 0.6, 1] });
+            obs.observe(root);
+          } catch (e) {}
         }
       })();
     </script>
