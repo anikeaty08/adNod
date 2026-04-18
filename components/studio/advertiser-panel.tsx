@@ -105,8 +105,8 @@ export function AdvertiserPanel() {
   const [creativeUri, setCreativeUri] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("news");
-  const [categoryMode, setCategoryMode] = useState<string>("news");
+  const [category, setCategory] = useState("");
+  const [categoryMode, setCategoryMode] = useState<string>(CUSTOM_CAT);
   const [apiCategories, setApiCategories] = useState<string[]>([]);
 
   useEffect(() => {

@@ -48,14 +48,15 @@ const sections: { id: string; title: string; blocks: Block[] }[] = [
     blocks: [
       {
         type: "p",
-        text: "This is the only flow most publishers need. You do not manually “sync metadata” or copy/paste ids from the chain.",
+        text: "Activate a placement on-chain, get approved for a campaign, then embed it on your site.",
       },
       {
         type: "ul",
         items: [
-          "Open Publisher → Slots → Activate placement (wallet tx).",
-          "Assign a campaign id that matches your category (wallet tx).",
-          "Open Embeds → pick your placement → copy code for your stack.",
+          "Open Publisher -> Slots -> Activate placement (wallet tx).",
+          "Request access for a campaign id (wallet tx).",
+          "After machine approval, assign the campaign to your placement (wallet tx).",
+          "Open Embeds -> pick your placement -> copy code for your stack.",
         ],
       },
       {
@@ -82,7 +83,7 @@ const sections: { id: string; title: string; blocks: Block[] }[] = [
       {
         type: "ul",
         items: [
-          "Categories must match exactly (recommended: pick from a shared preset list).",
+          "Categories help organize placements and match campaigns (optional for now).",
           "Embeds work on any site: plain script tag, iframe, React, or Next.js client component.",
           "Placements are owned by your wallet on-chain; earnings accrue to that wallet.",
         ],
@@ -145,11 +146,11 @@ export function AdNodePlacement() {
       {
         type: "ul",
         items: [
-          "GET /api/campaigns → list campaign metadata (used on Home and Studio lists).",
-          "GET /api/slots → list slot metadata (used on Publisher pages).",
-          "GET /api/campaign?id=4 → campaign metadata for a single id (used on campaign detail).",
-          "GET /api/embed?mode=frame&slotKey=... → hosted iframe HTML (used by embeds).",
-          "GET /api/embed?slotKey=... → JavaScript embed (default mode).",
+          "GET /api/campaigns -> list campaign metadata (Home + Studio lists).",
+          "GET /api/slots -> list slot metadata (Publisher pages).",
+          "GET /api/campaign?id=4 -> campaign metadata for a single id.",
+          "GET /api/embed?mode=frame&slotKey=... -> hosted iframe HTML (embeds).",
+          "GET /api/embed?slotKey=... -> JavaScript embed (default mode).",
         ],
       },
     ],
@@ -161,8 +162,8 @@ export function AdNodePlacement() {
       {
         type: "ul",
         items: [
-          "Campaign: an advertiser’s on-chain ad with public category and settlement terms.",
-          "Placement / slot: a publisher’s on-chain inventory unit with a category.",
+          "Campaign: an advertiser/hoster on-chain ad with public settlement terms.",
+          "Placement / slot: a publisher/developer on-chain inventory unit owned by your wallet.",
           "slotKey: an unguessable public key that maps to your on-chain slot id for embeds.",
         ],
       },
@@ -272,16 +273,16 @@ export function DocsGitbook() {
           </nav>
 
           <Link href="/app/studio/publisher" className="mt-8 inline-block text-sm text-accent hover:underline">
-            Open Publisher →
+            Open Publisher
           </Link>
           <Link href="/app/studio" className="mt-2 block text-sm text-accent hover:underline">
-            Open Studio →
+            Open Studio
           </Link>
         </aside>
 
         <article ref={articleRef} className="min-w-0 max-w-3xl flex-1">
           <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--text)]">Documentation</h1>
-          <p className="mt-2 text-sm text-muted">A short “how to use it” guide for publishers and advertisers.</p>
+          <p className="mt-2 text-sm text-muted">A short \"how to use it\" guide for publishers and advertisers.</p>
 
           <div className="mt-10 space-y-16">
             {sections.map((s) => (

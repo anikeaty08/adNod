@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import { useAccount, usePublicClient, useReadContract, useWalletClient } from "wagmi";
 import { waitForTransactionReceipt } from "viem/actions";
 import { decodeEventLog } from "viem";
 import type { Abi } from "viem";
@@ -55,6 +55,16 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
   const [embedLang, setEmbedLang] = useState<EmbedLanguage>("script");
   const [origin, setOrigin] = useState("");
 
+  const { data: accessApprover } = useReadContract({
+    address: CONTRACTS.registry,
+    abi: registryAbi,
+    functionName: "accessApprover",
+    query: { enabled: CONTRACTS_CONFIGURED },
+  });
+
+  const requiresApproval =
+    typeof accessApprover === "string" && accessApprover.toLowerCase() !== "0x0000000000000000000000000000000000000000";
+
   const loadLists = useCallback(async () => {
     try {
       const [c, s] = await Promise.all([getJson<CampaignRow[]>("/api/campaigns"), getJson<unknown[]>("/api/slots")]);
@@ -86,10 +96,35 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
     if (!siteName) setSiteName(window.location.hostname.replace(/^www\./, ""));
   }, [siteName, siteUrl]);
 
-  const matchingCampaigns = useMemo(() => {
-    if (!selectedSlot) return campaigns;
-    return campaigns.filter((c) => (c.category || "").toLowerCase() === selectedSlot.category.toLowerCase());
-  }, [campaigns, selectedSlot]);
+  const visibleCampaigns = useMemo(() => campaigns, [campaigns]);
+
+  const slotIdBig =
+    selectedSlot?.chainSlotId && /^\d+$/.test(selectedSlot.chainSlotId) ? BigInt(selectedSlot.chainSlotId) : null;
+  const campaignIdBig = assignCampaignId && /^\d+$/.test(assignCampaignId) ? BigInt(assignCampaignId) : null;
+
+  const { data: accessStatusRaw, refetch: refetchAccessStatus } = useReadContract({
+    address: CONTRACTS.registry,
+    abi: registryAbi,
+    functionName: "accessStatus",
+    args: requiresApproval && slotIdBig != null && campaignIdBig != null ? [campaignIdBig, slotIdBig] : undefined,
+    query: { enabled: requiresApproval && slotIdBig != null && campaignIdBig != null },
+  });
+
+  const accessStatus = useMemo(() => {
+    const v = typeof accessStatusRaw === "bigint" ? Number(accessStatusRaw) : Number(accessStatusRaw ?? 0);
+    switch (v) {
+      case 1:
+        return "Requested";
+      case 2:
+        return "Approved";
+      case 3:
+        return "Denied";
+      case 4:
+        return "Revoked";
+      default:
+        return "None";
+    }
+  }, [accessStatusRaw]);
 
   const registerSlot = useCallback(async () => {
     if (!address || !publicClient || !walletClient) return;
@@ -101,7 +136,7 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
         address: CONTRACTS.registry,
         abi: registryAbi,
         functionName: "registerSlot",
-        args: [siteName, category],
+        args: [siteName, category?.trim() ? category.trim() : "general"],
         ...feeOverrides,
       });
 
@@ -162,6 +197,24 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
     });
   }, [address, overlay, publicClient, walletClient, selectedSlot, assignCampaignId, loadLists]);
 
+  const requestAccess = useCallback(async () => {
+    if (!requiresApproval || !address || !publicClient || !walletClient || !selectedSlot || !campaignIdBig || !slotIdBig) return;
+
+    setBusy("");
+    await overlay.withMoney(async () => {
+      const feeOverrides = await estimateFeeOverrides(publicClient);
+      const hash = await walletClient.writeContract({
+        address: CONTRACTS.registry,
+        abi: registryAbi,
+        functionName: "requestAccess",
+        args: [campaignIdBig, slotIdBig],
+        ...feeOverrides,
+      });
+      await waitForTransactionReceipt(publicClient, { hash });
+      await refetchAccessStatus();
+    });
+  }, [requiresApproval, address, overlay, publicClient, walletClient, selectedSlot, campaignIdBig, slotIdBig, refetchAccessStatus]);
+
   const embedCode = selectedSlot
     ? buildEmbedForLanguage(embedLang, origin, {
         slotId: Number(selectedSlot.chainSlotId),
@@ -187,7 +240,7 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
               <Field label="Placement name" hint="A label for you (eg. homepage-top).">
                 <TextInput value={siteName} onChange={(e) => setSiteName(e.target.value)} />
               </Field>
-              <Field label="Category" hint="Must match an advertiser campaign.">
+              <Field label="Category" hint="Optional for now; it helps organize placements.">
                 <TextInput value={category} onChange={(e) => setCategory(e.target.value)} placeholder="news" list="adnode-category" />
               </Field>
               <datalist id="adnode-category">
@@ -209,7 +262,7 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
                 </div>
               </details>
               <PrimaryButton
-                disabled={!siteName || !category || !address || !!busy}
+                disabled={!siteName || !address || !!busy}
                 onClick={() => void registerSlot().catch((e) => setBusy(e instanceof Error ? e.message : "Failed"))}
               >
                 Activate placement
@@ -252,22 +305,43 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
           </p>
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <Field label="Assign campaign id" hint="Enter a campaign id that matches your category.">
+            <Field
+              label="Campaign id"
+              hint={requiresApproval ? "Request access first. Once approved, you can assign." : "Assigning is immediate on-chain."}
+            >
               <TextInput value={assignCampaignId} onChange={(e) => setAssignCampaignId(e.target.value)} placeholder="1" />
             </Field>
             <div className="flex items-end">
-              <PrimaryButton
-                disabled={!assignCampaignId || !!busy}
-                onClick={() => void assign().catch((e) => setBusy(e instanceof Error ? e.message : "Assign failed"))}
-              >
-                Assign campaign
-              </PrimaryButton>
+              <div className="flex flex-wrap gap-2">
+                {requiresApproval ? (
+                  <PrimaryButton
+                    variant="secondary"
+                    disabled={!campaignIdBig || !!busy || accessStatus === "Requested" || accessStatus === "Revoked"}
+                    onClick={() => void requestAccess().catch((e) => setBusy(e instanceof Error ? e.message : "Request failed"))}
+                  >
+                    Request access
+                  </PrimaryButton>
+                ) : null}
+                <PrimaryButton
+                  disabled={!assignCampaignId || !!busy || (requiresApproval && accessStatus !== "Approved")}
+                  onClick={() => void assign().catch((e) => setBusy(e instanceof Error ? e.message : "Assign failed"))}
+                >
+                  Assign campaign
+                </PrimaryButton>
+              </div>
             </div>
           </div>
 
-          <p className="mt-3 text-xs text-muted">Matching campaigns: {matchingCampaigns.length}</p>
+          {requiresApproval ? (
+            <p className="mt-2 text-xs text-muted">
+              Access status: <span className="font-semibold text-[var(--text)]">{accessStatus}</span>
+              {accessStatus === "Requested" ? " (waiting for approval)" : ""}
+            </p>
+          ) : null}
+
+          <p className="mt-3 text-xs text-muted">Campaigns: {visibleCampaigns.length}</p>
           <ul className="mt-2 flex flex-wrap gap-2">
-            {matchingCampaigns.slice(0, 10).map((c) => (
+            {visibleCampaigns.slice(0, 12).map((c) => (
               <li key={c.chainCampaignId}>
                 <button
                   type="button"

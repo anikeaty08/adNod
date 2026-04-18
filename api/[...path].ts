@@ -13,7 +13,7 @@ import { verifyMeasurementToken, buildMeasurementFingerprint, buildMeasurementEv
 import { recordMeasurement } from "../server/measurement-store.js";
 import { markMeasurementPending, syncMeasurementToChain, replayPendingMeasurements } from "../server/settlement-service.js";
 import { decodeEventLog, formatEther, parseEther } from "viem";
-import adRegistryAbi from "../src/lib/abi/AdRegistry.json" with { type: "json" };
+import adRegistryAbi from "../src/lib/abi/registry-abi.json" with { type: "json" };
 
 function getUrl(req: IncomingMessage) {
   const host = req.headers.host || "localhost";

@@ -1,6 +1,7 @@
 import { buildAdnodeAuthMessage, adnodeAuthHeaders } from "./adnode-auth";
 
-const DEFAULT_API_BASE = typeof window === "undefined" ? "http://127.0.0.1:4000" : "";
+// Default to same-origin API (works on Vercel + local Next dev). Override via NEXT_PUBLIC_API_URL if you host an external API.
+const DEFAULT_API_BASE = "";
 const RAW_API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || DEFAULT_API_BASE;
 const API_BASE =
   typeof window !== "undefined" && (RAW_API_BASE.includes("127.0.0.1:") || RAW_API_BASE.includes("localhost:"))
@@ -28,6 +29,7 @@ export async function signedPostJson<T>(
     body: JSON.stringify(payload),
   });
   const text = await res.text();
+  const ct = String(res.headers.get("content-type") ?? "");
   let data: unknown = {};
   try {
     data = text ? JSON.parse(text) : {};
@@ -35,6 +37,9 @@ export async function signedPostJson<T>(
     data = { raw: text };
   }
   if (!res.ok) {
+    if (ct.includes("text/html")) {
+      throw new Error("API endpoint returned HTML (likely misconfigured route).");
+    }
     const err = (data as { error?: string }).error || text || res.statusText;
     throw new Error(typeof err === "string" ? err : "API request failed");
   }
@@ -50,6 +55,7 @@ export async function postJson<T>(path: string, payload: Record<string, unknown>
     body: JSON.stringify(payload),
   });
   const text = await res.text();
+  const ct = String(res.headers.get("content-type") ?? "");
   let data: unknown = {};
   try {
     data = text ? JSON.parse(text) : {};
@@ -57,6 +63,9 @@ export async function postJson<T>(path: string, payload: Record<string, unknown>
     data = { raw: text };
   }
   if (!res.ok) {
+    if (ct.includes("text/html")) {
+      throw new Error("API endpoint returned HTML (likely misconfigured route).");
+    }
     const err = (data as { error?: string }).error || text || res.statusText;
     throw new Error(typeof err === "string" ? err : "API request failed");
   }
@@ -66,11 +75,28 @@ export async function postJson<T>(path: string, payload: Record<string, unknown>
 export async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${getApiBase()}${path}`);
   const text = await res.text();
-  if (!res.ok) throw new Error(text || res.statusText);
+
+  let data: unknown = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+
+  if (!res.ok) {
+    const ct = String(res.headers.get("content-type") ?? "");
+    if (ct.includes("text/html")) {
+      throw new Error("API endpoint returned HTML (likely misconfigured route).");
+    }
+    const err = (data as { error?: string } | null)?.error;
+    throw new Error(err || text || res.statusText);
+  }
+
+  if (data !== null) return data as T;
   return JSON.parse(text || "null") as T;
 }
 
-/** Public help chat â€” same-origin `/api/assistant-chat` so it works without pointing the UI at :4000. */
+/** Public help chat - same-origin `/api/assistant-chat` so it works on Vercel/local without extra config. */
 export async function postAssistantChat<T>(body: { prompt: string; history: Array<{ role: string; content: string }> }): Promise<T> {
   const base = getApiBase();
   const url = base ? `${base}/api/assistant-chat` : "/api/assistant-chat";

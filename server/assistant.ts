@@ -59,7 +59,7 @@ const FAQ_ENTRIES: Array<{
       text.includes("how do developers earn") ||
       (text.includes("who earns") && text.includes("ad placements")),
     reply:
-      "Developers are the publishers on AdNode. They earn by registering ad slots and serving campaigns in those placements. Lifetime earnings stay encrypted for the developer, while funded payouts become claimable after an authorized settlement service books delivery.",
+      "Developers are the publishers on AdNode. They earn by registering placements (slots), requesting access to campaigns, and serving approved campaigns in those placements. Payouts become claimable after the settlement service books delivery from the campaign budget.",
   },
   {
     test: (text) => text.includes("how do i add an ad creative") || (text.includes("add") && text.includes("creative")),
@@ -119,10 +119,18 @@ async function getDataReply(prompt: string) {
 
   if (asksCampaigns) {
     const rows = (Array.isArray(campaigns) ? campaigns : []) as Array<Record<string, unknown>>;
-    const ids = rows
-      .map((r) => String(r.chainCampaignId ?? ""))
-      .filter(Boolean)
+    const top = rows
+      .slice()
+      .sort((a, b) => Number(String(b.chainCampaignId ?? 0)) - Number(String(a.chainCampaignId ?? 0)))
       .slice(0, 5);
+    const ids = top
+      .map((r) => {
+        const id = String(r.chainCampaignId ?? "").trim();
+        if (!id) return "";
+        const title = String(r.title ?? "").trim();
+        return title ? `${title} (#${id})` : `Campaign #${id}`;
+      })
+      .filter(Boolean);
     return {
       reply:
         rows.length === 0
@@ -134,10 +142,19 @@ async function getDataReply(prompt: string) {
 
   if (asksSlots) {
     const rows = (Array.isArray(slots) ? slots : []) as Array<Record<string, unknown>>;
-    const ids = rows
-      .map((r) => String(r.chainSlotId ?? ""))
-      .filter(Boolean)
+    const top = rows
+      .slice()
+      .sort((a, b) => Number(String(b.chainSlotId ?? 0)) - Number(String(a.chainSlotId ?? 0)))
       .slice(0, 5);
+    const ids = top
+      .map((r) => {
+        const id = String(r.chainSlotId ?? "").trim();
+        if (!id) return "";
+        const name = String(r.siteName ?? "").trim();
+        const slotKey = String(r.slotKey ?? "").trim();
+        return `${name || `Placement #${id}`}${slotKey ? ` (${slotKey})` : ""}`;
+      })
+      .filter(Boolean);
     return {
       reply:
         rows.length === 0
@@ -209,6 +226,10 @@ async function getGroqReply(prompt: string, history: AssistantMessage[], apiKey:
 
 function polishAssistantText(text: string) {
   let out = text;
+  out = out.replace(/â€”/g, "—");
+  out = out.replace(/â†’/g, "->");
+  out = out.replace(/â€œ/g, "\"");
+  out = out.replace(/â€/g, "\"");
   out = out.replace(/#(0x[a-fA-F0-9]{64})/g, "$1");
   out = out.replace(/\bhash:\s*(0x[a-fA-F0-9]{64})/gi, "**Tx:** $1");
   out = out.replace(/\btx hash:\s*(0x[a-fA-F0-9]{64})/gi, "**Tx:** $1");

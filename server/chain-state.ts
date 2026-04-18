@@ -1,6 +1,6 @@
 import { createPublicClient, defineChain, http } from "viem";
 import { arbitrumSepolia } from "viem/chains";
-import adRegistryAbi from "../src/lib/abi/AdRegistry.json" with { type: "json" };
+import adRegistryAbi from "../src/lib/abi/registry-abi.json" with { type: "json" };
 import { FHELIUM_CHAIN_ID, getConfiguredChainId } from "./runtime.js";
 
 export type RegistryChainHealth = {

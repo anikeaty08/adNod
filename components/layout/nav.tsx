@@ -24,7 +24,7 @@ const publisherStudioLinks: readonly { href: string; label: string; icon: Lucide
   { href: "/app/studio/publisher/embeds", label: "Embeds", icon: LayoutGrid },
 ] as const;
 
-/** Shown on marketing home, docs, and /app routes outside Studio — order: Home → Studio → Publisher → Account → Docs. */
+/** Shown on marketing home, docs, and /app routes outside Studio. */
 const browseLinks: readonly { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/app/studio", label: "Studio", icon: Clapperboard },
@@ -55,7 +55,14 @@ export function Nav() {
   const ok = chainId === ADNODE_CHAIN_ID;
   const studioMode = pathname?.startsWith("/app/studio") ?? false;
   const publisherStudioMode = pathname?.startsWith("/app/studio/publisher") ?? false;
-  const links = studioMode ? (publisherStudioMode ? publisherStudioLinks : studioLinks) : browseLinks;
+  const studioHomeMode = pathname === "/app/studio";
+  const links = studioMode
+    ? studioHomeMode
+      ? studioLinks.slice(0, 2)
+      : publisherStudioMode
+        ? publisherStudioLinks
+        : studioLinks
+    : browseLinks;
   const mode = studioMode ? "studio" : "browse";
 
   return (

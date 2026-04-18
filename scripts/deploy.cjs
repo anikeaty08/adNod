@@ -27,12 +27,18 @@ async function main() {
   await (await analytics.grantRole(await analytics.REPORTER_ROLE(), deployer.address)).wait();
   await (await analytics.grantRole(await analytics.EARNINGS_ROLE(), deployer.address)).wait();
 
+  const accessApprover = process.env.ACCESS_APPROVER_ADDRESS;
+  if (accessApprover) {
+    await (await registry.setAccessApprover(accessApprover)).wait();
+  }
+
   const deployment = {
     network: network.name,
     payoutWrapper: await payoutWrapper.getAddress(),
     wrappedNativeToken: wrappedNativeAddress,
     adRegistry: await registry.getAddress(),
     adAnalytics: await analytics.getAddress(),
+    accessApprover: accessApprover || null,
     deployedAt: new Date().toISOString(),
   };
 
@@ -45,9 +51,6 @@ async function main() {
   const analyticsArtifact = await hre.artifacts.readArtifact("AdAnalytics");
   const abiDir = path.join(process.cwd(), "src", "lib", "abi");
   fs.mkdirSync(abiDir, { recursive: true });
-  fs.writeFileSync(path.join(abiDir, "AdNodePayoutWrapper.json"), JSON.stringify(payoutWrapperArtifact.abi, null, 2));
-  fs.writeFileSync(path.join(abiDir, "AdRegistry.json"), JSON.stringify(registryArtifact.abi, null, 2));
-  fs.writeFileSync(path.join(abiDir, "AdAnalytics.json"), JSON.stringify(analyticsArtifact.abi, null, 2));
   fs.writeFileSync(path.join(abiDir, "payout-wrapper-abi.json"), JSON.stringify(payoutWrapperArtifact.abi, null, 2));
   fs.writeFileSync(path.join(abiDir, "registry-abi.json"), JSON.stringify(registryArtifact.abi, null, 2));
   fs.writeFileSync(path.join(abiDir, "analytics-abi.json"), JSON.stringify(analyticsArtifact.abi, null, 2));
@@ -55,6 +58,7 @@ async function main() {
   console.log(`AdNodePayoutWrapper deployed to ${deployment.payoutWrapper} on ${network.name}`);
   console.log(`AdRegistry deployed to ${deployment.adRegistry} on ${network.name}`);
   console.log(`AdAnalytics deployed to ${deployment.adAnalytics} on ${network.name}`);
+  if (accessApprover) console.log(`Access approver set to ${accessApprover}`);
 }
 
 main().catch((error) => {

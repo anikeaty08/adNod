@@ -34,7 +34,7 @@ const CHART_COLORS = ["#0ea5e9", "#6366f1", "#22c55e", "#f59e0b", "#ec4899"];
 function settlementLabel(model: number | undefined) {
   if (model === 1) return "CPC";
   if (model === 2) return "CPM";
-  return model != null ? `Model #${model}` : "Ã¢â‚¬â€";
+  return model != null ? `Model #${model}` : "N/A";
 }
 
 export default function StudioCampaignDetailPage() {
@@ -151,7 +151,7 @@ export default function StudioCampaignDetailPage() {
   }, [funding, row?.createdAt, hydrated]);
 
   if (loading) {
-    return <p className="text-sm text-muted">LoadingÃ¢â‚¬Â¦</p>;
+    return <p className="text-sm text-muted">Loading...</p>;
   }
 
   if (!idOk) {
@@ -159,7 +159,7 @@ export default function StudioCampaignDetailPage() {
       <GlassPanel className="p-6">
         <p className="text-muted">Invalid campaign id.</p>
         <Link href="/app/studio/campaigns" className="mt-4 inline-block text-sm text-accent hover:underline">
-          Ã¢â€ Â Your campaigns
+          Back to campaigns
         </Link>
       </GlassPanel>
     );
@@ -171,12 +171,12 @@ export default function StudioCampaignDetailPage() {
   const rateWei = terms?.[1];
 
   const displayTitle = displayCampaignTitle({ title: row?.title ? String(row.title) : null, chainCampaignId: idNum });
-  const displayCategory = row?.category ? String(row.category) : chainCategory || "Ã¢â‚¬â€";
+  const displayCategory = row?.category ? String(row.category) : chainCategory || "Uncategorized";
 
   return (
     <div className="space-y-6">
       <Link href="/app/studio/campaigns" className="text-sm text-accent hover:underline">
-        Ã¢â€ Â Your campaigns
+        Back to campaigns
       </Link>
 
       {!row && err ? (
@@ -199,14 +199,14 @@ export default function StudioCampaignDetailPage() {
           {row ? (
             <>
               {" "}
-              Ã‚Â· API: {String(row.pricingModel ?? "Ã¢â‚¬â€")} Ã‚Â· rate {String(row.rate ?? "Ã¢â‚¬â€")}
+              · {String(row.pricingModel ?? "N/A")} · rate {String(row.rate ?? "N/A")}
             </>
           ) : null}
-          {typeof chainActive === "boolean" ? ` Ã‚Â· on-chain ${chainActive ? "active" : "paused"}` : null}
+          {typeof chainActive === "boolean" ? ` · on-chain ${chainActive ? "active" : "paused"}` : null}
         </p>
         {isHoster ? (
           <p className="mt-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
-            You are the registered hoster for this campaign Ã¢â‚¬â€ funding and settlement charts reflect your registry view.
+            You are the registered hoster for this campaign — funding and settlement charts reflect your registry view.
           </p>
         ) : address && hoster ? (
           <p className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
@@ -221,11 +221,11 @@ export default function StudioCampaignDetailPage() {
           {row ? (
             <>
               <p className="text-sm text-muted">
-                <strong className="text-[var(--text)]">Advertiser</strong> {String(row.advertiser ?? hoster ?? "Ã¢â‚¬â€")}
+                <strong className="text-[var(--text)]">Advertiser</strong> {String(row.advertiser ?? hoster ?? "N/A")}
               </p>
               <p className="text-sm text-muted">
                 <strong className="text-[var(--text)]">Creative</strong>{" "}
-                <span className="break-all font-mono text-xs">{String(row.creativeURI ?? "Ã¢â‚¬â€")}</span>
+                <span className="break-all font-mono text-xs">{String(row.creativeURI ?? "N/A")}</span>
               </p>
               <div>
                 <p className="text-xs font-semibold uppercase text-muted">Description</p>
@@ -233,7 +233,7 @@ export default function StudioCampaignDetailPage() {
               </div>
               {row.createdAt ? (
                 <p className="text-xs text-muted" suppressHydrationWarning>
-                  Synced {hydrated ? new Date(String(row.createdAt)).toLocaleString() : "Ã¢â‚¬â€"}
+                  Synced {hydrated ? new Date(String(row.createdAt)).toLocaleString() : "N/A"}
                 </p>
               ) : null}
             </>
@@ -251,29 +251,29 @@ export default function StudioCampaignDetailPage() {
           ) : chainErr ? (
             <p className="text-sm text-red-300">Could not read registry: {chainErr.message}</p>
           ) : !onchain ? (
-            <p className="text-sm text-muted">Loading chain dataÃ¢â‚¬Â¦</p>
+            <p className="text-sm text-muted">Loading chain data...</p>
           ) : (
             <ul className="space-y-2 text-sm text-muted">
               <li>
                 <span className="text-[var(--text)]">Hoster</span>{" "}
-                <span className="font-mono text-xs">{hoster ?? "Ã¢â‚¬â€"}</span>
+                <span className="font-mono text-xs">{hoster ?? "N/A"}</span>
               </li>
               <li>
-                <span className="text-[var(--text)]">Creative / category</span> {chainCreative || "Ã¢â‚¬â€"} Ã‚Â· {chainCategory || "Ã¢â‚¬â€"}
+                <span className="text-[var(--text)]">Creative / category</span> {chainCreative || "N/A"} - {chainCategory || "N/A"}
               </li>
               <li>
                 <span className="text-[var(--text)]">Settlement</span> {settlementLabel(terms?.[0])}{" "}
                 {rateWei != null ? (
-                  <span className="font-mono text-xs"> Ã‚Â· {formatEther(rateWei)} ETH unit</span>
+                  <span className="font-mono text-xs"> - {formatEther(rateWei)} ETH unit</span>
                 ) : null}
               </li>
               {funding ? (
                 <li>
-                  <span className="text-[var(--text)]">Funding handles</span> available {formatEther(funding[0])} Ã‚Â· funded{" "}
-                  {formatEther(funding[1])} Ã‚Â· settled {formatEther(funding[2])} (tFHE labels mirror Account)
+                  <span className="text-[var(--text)]">Funding</span> available {formatEther(funding[0])} - funded{" "}
+                  {formatEther(funding[1])} - settled {formatEther(funding[2])}
                 </li>
               ) : (
-                <li>No funding tuple Ã¢â‚¬â€ id may be out of range for this registry.</li>
+                <li>No funding tuple - id may be out of range for this registry.</li>
               )}
             </ul>
           )}
@@ -283,7 +283,7 @@ export default function StudioCampaignDetailPage() {
       {CONTRACTS_CONFIGURED && funding && (
         <div className="grid gap-6 lg:grid-cols-2">
           <GlassPanel className="p-5">
-            <p className="mb-3 text-xs font-semibold uppercase text-muted">Bar Ã¢â‚¬â€ available vs settled vs funded</p>
+            <p className="mb-3 text-xs font-semibold uppercase text-muted">Bar: available vs settled vs funded</p>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={fundingBar}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#33415555" />
@@ -298,7 +298,7 @@ export default function StudioCampaignDetailPage() {
             </ResponsiveContainer>
           </GlassPanel>
           <GlassPanel className="p-5">
-            <p className="mb-3 text-xs font-semibold uppercase text-muted">Pie Ã¢â‚¬â€ settled vs remainder of funded</p>
+            <p className="mb-3 text-xs font-semibold uppercase text-muted">Pie: settled vs remaining funded</p>
             {fundingPie.length === 0 ? (
               <p className="text-sm text-muted">Not enough non-zero values to chart.</p>
             ) : (
@@ -315,7 +315,7 @@ export default function StudioCampaignDetailPage() {
             )}
           </GlassPanel>
           <GlassPanel className="p-5 lg:col-span-2">
-            <p className="mb-3 text-xs font-semibold uppercase text-muted">Area Ã¢â‚¬â€ settled growth (API sync Ã¢â€ â€™ now)</p>
+            <p className="mb-3 text-xs font-semibold uppercase text-muted">Area: settled growth over time</p>
             <p className="mb-2 text-xs text-muted">
               Impression/click counts live in encrypted analytics handles; this curve uses public settled totals at sync time vs now.
             </p>
