@@ -14,7 +14,7 @@ const FAQ_ENTRIES: Array<{
   {
     test: (text) => text.includes("what is adnode"),
     reply:
-      "AdNode is a decentralized advertising network on Fhenix Arbitrum Sepolia where campaign strategy and lifetime earnings stay encrypted on-chain with FHE. Public metadata is limited to creatives, categories, and slot information.",
+      "### Introduction to AdNode\nAdNode runs on Fhenix Arbitrum Sepolia with CoFHE.\n### Roles\n- **Hoster**: advertiser, funds campaigns.\n- **Developer**: publisher, earns from ad placements.",
   },
   {
     test: (text) => text.includes("what problem does adnode solve") || (text.includes("problem") && text.includes("adnode")),
@@ -127,7 +127,7 @@ async function getDataReply(prompt: string) {
       reply:
         rows.length === 0
           ? "No campaigns are in the API store yet. Create a campaign in Studio and it will show up here."
-          : `Yes — **${rows.length}** campaign(s) are listed. Latest ids: ${ids.map((id) => `#${id}`).join(", ")}.`,
+          : `Yes — **${rows.length}** campaign(s) are listed. Latest ids: ${ids.map((id) => `**${id}**`).join(", ")}.`,
       model: "AdNode Live Data",
     };
   }
@@ -142,7 +142,7 @@ async function getDataReply(prompt: string) {
       reply:
         rows.length === 0
           ? "No slots are in the API store yet. Register a slot in Publisher and it will show up here."
-          : `Yes — **${rows.length}** slot(s) are listed. Latest ids: ${ids.map((id) => `#${id}`).join(", ")}.`,
+          : `Yes — **${rows.length}** slot(s) are listed. Latest ids: ${ids.map((id) => `**${id}**`).join(", ")}.`,
       model: "AdNode Live Data",
     };
   }
@@ -207,14 +207,23 @@ async function getGroqReply(prompt: string, history: AssistantMessage[], apiKey:
   };
 }
 
+function polishAssistantText(text: string) {
+  let out = text;
+  out = out.replace(/#(0x[a-fA-F0-9]{64})/g, "$1");
+  out = out.replace(/\bhash:\s*(0x[a-fA-F0-9]{64})/gi, "**Tx:** $1");
+  out = out.replace(/\btx hash:\s*(0x[a-fA-F0-9]{64})/gi, "**Tx:** $1");
+  out = out.replace(/\btransaction hash:\s*(0x[a-fA-F0-9]{64})/gi, "**Tx:** $1");
+  return out.trim();
+}
+
 export async function getAssistantReply(prompt: string, history: AssistantMessage[] = []) {
   const faqReply = getFaqReply(prompt);
   if (faqReply) {
-    return { reply: faqReply, model: "AdNode FAQ" };
+    return { reply: polishAssistantText(faqReply), model: "AdNode FAQ" };
   }
 
   const dataReply = await getDataReply(prompt);
-  if (dataReply) return dataReply;
+  if (dataReply) return { ...dataReply, reply: polishAssistantText(dataReply.reply) };
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -222,5 +231,6 @@ export async function getAssistantReply(prompt: string, history: AssistantMessag
   }
 
   const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
-  return getGroqReply(prompt, history, apiKey, model);
+  const groq = await getGroqReply(prompt, history, apiKey, model);
+  return { ...groq, reply: polishAssistantText(groq.reply) };
 }

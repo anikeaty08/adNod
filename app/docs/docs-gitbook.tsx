@@ -19,7 +19,11 @@ const sections: { id: string; title: string; blocks: Block[] }[] = [
     blocks: [
       {
         type: "p",
-        text: "AdNode is a simple two-sided app: advertisers create campaigns, publishers create placements (slots) and embed them on their sites.",
+        text: "AdNode runs on Fhenix Arbitrum Sepolia with CoFHE.",
+      },
+      {
+        type: "p",
+        text: "Roles: Hoster (advertiser) funds campaigns. Developer (publisher) earns from ad placements.",
       },
       {
         type: "cta",
@@ -332,4 +336,3 @@ export function DocsGitbook() {
     </>
   );
 }
-
