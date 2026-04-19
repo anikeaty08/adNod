@@ -112,7 +112,7 @@ flowchart TD
 | | `server/public-campaigns.ts` | Embed HTML, creative resolution, SSRF guard |
 | | `server/measurement.ts`, `server/chain-state.ts` | Measures + viem client |
 | **Serverless** | `api/*.ts` | Vercel-style API parity |
-| **ABIs** | `lib/abi/*.json`, `src/lib/abi/*.json` | Shared ABIs for app + server |
+| **ABIs** | `lib/abi/*.json` | Shared ABIs for app + server |
 | **Docs** | `docs/ADNODE_ARCHITECTURE.md`, `docs/ADNODE_AUDIT_REPORT.md` | Deeper design / notes |
 | **Config** | `.env.example`, `next.config.mjs`, `tsconfig.json` | Env + build |
 
@@ -153,7 +153,7 @@ Copy `.env.example` → `.env`. Minimum for the app:
 npx hardhat run scripts/deploy.cjs --network fhenixArbitrumSepolia
 ```
 
-This writes **`deployments/fhenixArbitrumSepolia.json`** and refreshes **`src/lib/abi/*.json`**.
+This writes **`deployments/fhenixArbitrumSepolia.json`** and refreshes **`lib/abi/*.json`**.
 
 **Fhenix Helium** — use `npm run deploy:helium` (network `fhenixHelium`, writes `deployments/fhenixHelium.json`). Then set `NEXT_PUBLIC_ADNODE_NETWORK=fhenixHelium` and matching env addresses.
 

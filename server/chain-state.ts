@@ -1,6 +1,6 @@
 import { createPublicClient, defineChain, http } from "viem";
 import { arbitrumSepolia } from "viem/chains";
-import adRegistryAbi from "../src/lib/abi/registry-abi.json" with { type: "json" };
+import adRegistryAbi from "../lib/abi/registry-abi.json" with { type: "json" };
 import fhenixHelium from "../deployments/fhenixHelium.json" with { type: "json" };
 import fhenixArbitrumSepolia from "../deployments/fhenixArbitrumSepolia.json" with { type: "json" };
 import { FHELIUM_CHAIN_ID, getConfiguredChainId } from "./runtime.js";

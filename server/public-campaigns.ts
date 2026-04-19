@@ -1,4 +1,4 @@
-import adRegistryAbi from "../src/lib/abi/registry-abi.json" with { type: "json" };
+import adRegistryAbi from "../lib/abi/registry-abi.json" with { type: "json" };
 import { getCampaigns } from "./campaign-store.js";
 import { getSlots } from "./slot-store.js";
 import { adRegistryAddress, serverPublicClient as publicClient } from "./chain-state.js";

@@ -49,7 +49,7 @@ async function main() {
   const payoutWrapperArtifact = await hre.artifacts.readArtifact("AdNodePayoutWrapper");
   const registryArtifact = await hre.artifacts.readArtifact("AdRegistry");
   const analyticsArtifact = await hre.artifacts.readArtifact("AdAnalytics");
-  const abiDir = path.join(process.cwd(), "src", "lib", "abi");
+  const abiDir = path.join(process.cwd(), "lib", "abi");
   fs.mkdirSync(abiDir, { recursive: true });
   fs.writeFileSync(path.join(abiDir, "payout-wrapper-abi.json"), JSON.stringify(payoutWrapperArtifact.abi, null, 2));
   fs.writeFileSync(path.join(abiDir, "registry-abi.json"), JSON.stringify(registryArtifact.abi, null, 2));
