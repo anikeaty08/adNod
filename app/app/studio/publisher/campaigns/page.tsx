@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAccount, usePublicClient, useReadContract, useWalletClient } from "wagmi";
 import { waitForTransactionReceipt } from "viem/actions";
 import type { Abi } from "viem";
@@ -60,6 +61,7 @@ function byDescId(a: CampaignRow, b: CampaignRow) {
 
 export default function PublisherCampaignsPage() {
   const overlay = useOverlay();
+  const router = useRouter();
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
@@ -203,7 +205,10 @@ export default function PublisherCampaignsPage() {
       await waitForTransactionReceipt(publicClient, { hash });
       await loadLists();
     });
-  }, [address, publicClient, walletClient, overlay, selectedSlotNum, selectedCampaignNum, requiresApproval, accessStatus, loadLists]);
+
+    // Success: guide the user to the embed snippet for this placement.
+    router.push(`/app/studio/publisher/embeds?slotId=${encodeURIComponent(String(selectedSlotNum))}&live=1`);
+  }, [address, publicClient, walletClient, overlay, selectedSlotNum, selectedCampaignNum, requiresApproval, accessStatus, loadLists, router]);
 
   const slotSummary = selectedSlot
     ? `${selectedSlot.siteName || "Placement"} (#${selectedSlot.chainSlotId})${selectedSlot.slotKey ? ` · ${selectedSlot.slotKey}` : ""}`

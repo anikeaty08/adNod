@@ -30,7 +30,6 @@ const publisherStudioLinks: readonly { href: string; label: string; icon: Lucide
 const browseLinks: readonly { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/app/studio", label: "Studio", icon: Clapperboard },
-  { href: "/app/account", label: "Account", icon: Wallet },
   { href: "/docs", label: "Docs", icon: BookOpen },
 ] as const;
 
@@ -46,7 +45,6 @@ function linkActive(pathname: string | null, href: string, mode: "studio" | "bro
   }
 
   if (href === "/docs") return pathname === "/docs" || pathname.startsWith("/docs/");
-  if (href === "/app/account") return pathname.startsWith("/app/account");
   if (href === "/app/studio") return pathname.startsWith("/app/studio");
   return pathname === href || pathname.startsWith(`${href}/`);
 }

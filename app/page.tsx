@@ -53,8 +53,8 @@ export default function LandingPage() {
               <PrimaryButton href="/app/studio/publisher" variant="secondary">
                 <LayoutTemplate size={18} /> Publisher
               </PrimaryButton>
-              <PrimaryButton href="/app/account" variant="ghost">
-                <Wallet size={18} /> Account
+              <PrimaryButton href="/app/studio/publisher/earnings" variant="ghost">
+                <Wallet size={18} /> Earnings
               </PrimaryButton>
               <PrimaryButton href="/docs" variant="ghost">
                 <BookOpen size={18} /> Docs

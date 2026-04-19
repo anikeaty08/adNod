@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount, usePublicClient, useReadContract, useWalletClient } from "wagmi";
@@ -37,7 +37,13 @@ const LANGS: { id: EmbedLanguage; label: string }[] = [
   { id: "next", label: "Next.js (client)" },
 ];
 
-export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }) {
+export function PublisherPanel({
+  view = "slots",
+  initialSlotId,
+}: {
+  view?: "slots" | "embeds";
+  initialSlotId?: string | null;
+}) {
   const overlay = useOverlay();
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -93,6 +99,14 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
   useEffect(() => {
     setOrigin(window.location.origin);
   }, []);
+
+  useEffect(() => {
+    if (!initialSlotId) return;
+    if (!slots.length) return;
+    if (selectedSlot?.chainSlotId === initialSlotId) return;
+    const found = slots.find((s) => s.chainSlotId === initialSlotId);
+    if (found) setSelectedSlot(found);
+  }, [initialSlotId, slots, selectedSlot?.chainSlotId]);
 
   const visibleCampaigns = useMemo(() => campaigns, [campaigns]);
 
@@ -384,6 +398,7 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
                     >
                       <span className="font-medium text-[var(--text)]">{s.siteName || "Untitled placement"}</span>
                       <span className="ml-2 text-xs text-muted">{s.category || "—"}</span>
+                      {s.assignedCampaignId ? <span className="ml-2 text-xs text-muted">· running #{s.assignedCampaignId}</span> : null}
                     </button>
                   </li>
                 ))}
@@ -429,3 +444,4 @@ export function PublisherPanel({ view = "slots" }: { view?: "slots" | "embeds" }
     </div>
   );
 }
+

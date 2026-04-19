@@ -7,8 +7,8 @@ export function SiteFooter() {
         <div>
           <p className="font-display text-lg font-semibold text-[var(--text)]">AdNode</p>
           <p className="mt-3 max-w-md text-sm leading-relaxed text-muted">
-            We&apos;re building confidential ad settlement: advertisers keep strategy private where the chain allows it, while
-            payouts stay tied to clear CPC/CPM rules in wei so publishers and auditors can trust the math — not a black box.
+            We&apos;re building confidential ad settlement: advertisers keep strategy private where the chain allows it, while payouts stay tied to
+            clear CPC/CPM rules in wei so publishers and auditors can trust the math — not a black box.
           </p>
         </div>
         <div>
@@ -25,13 +25,13 @@ export function SiteFooter() {
               </Link>
             </li>
             <li>
-              <Link href="/app/publisher" className="cursor-pointer hover:text-[var(--text)]">
-                Publisher / embed
+              <Link href="/app/studio/publisher" className="cursor-pointer hover:text-[var(--text)]">
+                Publisher
               </Link>
             </li>
             <li>
-              <Link href="/app/account" className="cursor-pointer hover:text-[var(--text)]">
-                Account & finance
+              <Link href="/app/studio/publisher/earnings" className="cursor-pointer hover:text-[var(--text)]">
+                Earnings
               </Link>
             </li>
             <li>
@@ -56,3 +56,4 @@ export function SiteFooter() {
     </footer>
   );
 }
+
