@@ -307,7 +307,28 @@ async function handleCampaignAutoSync(req: IncomingMessage, res: ServerResponse)
 
 async function handleSlots(req: IncomingMessage, res: ServerResponse) {
   if (req.method === "GET") {
-    const slots = await getSlots();
+    const slots = (await getSlots()) as Array<Record<string, unknown>>;
+
+    // Best-effort: keep assignedCampaignId fresh from the chain so Publisher can act without manual syncing.
+    try {
+      await getRegistryChainHealth();
+      const slice = slots.slice(0, 60);
+      await Promise.all(
+        slice.map(async (s) => {
+          const id = String(s.chainSlotId ?? "");
+          if (!/^\d+$/.test(id)) return;
+          try {
+            const assigned = await getAssignedCampaignId(id);
+            if (assigned) s.assignedCampaignId = assigned;
+          } catch {
+            // ignore
+          }
+        }),
+      );
+    } catch {
+      // ignore chain sync failures; still return DB results
+    }
+
     return sendJson(res, 200, slots);
   }
 

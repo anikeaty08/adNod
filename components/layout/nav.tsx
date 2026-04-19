@@ -20,8 +20,10 @@ const studioLinks: readonly { href: string; label: string; icon: LucideIcon }[] 
 
 const publisherStudioLinks: readonly { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/app/studio/publisher", label: "Home", icon: Home },
+  { href: "/app/studio/publisher/campaigns", label: "Campaigns", icon: LayoutGrid },
   { href: "/app/studio/publisher/slots", label: "Publisher slot", icon: LayoutTemplate },
   { href: "/app/studio/publisher/embeds", label: "Embeds", icon: LayoutGrid },
+  { href: "/app/studio/publisher/earnings", label: "Earnings", icon: Wallet },
 ] as const;
 
 /** Shown on marketing home, docs, and /app routes outside Studio. */
