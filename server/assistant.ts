@@ -14,7 +14,7 @@ const FAQ_ENTRIES: Array<{
   {
     test: (text) => text.includes("what is adnode"),
     reply:
-      "### Introduction to AdNode\nAdNode runs on Fhenix Arbitrum Sepolia with CoFHE.\n### Roles\n- **Hoster**: advertiser, funds campaigns.\n- **Developer**: publisher, earns from ad placements.",
+      "**Introduction to AdNode**\nAdNode runs on Fhenix Arbitrum Sepolia with CoFHE.\n\n**Roles**\n- **Hoster**: advertiser, funds campaigns.\n- **Developer**: publisher, earns from ad placements.",
   },
   {
     test: (text) => text.includes("what problem does adnode solve") || (text.includes("problem") && text.includes("adnode")),
@@ -197,7 +197,9 @@ async function getGroqReply(prompt: string, history: AssistantMessage[], apiKey:
             "Encrypted data: budget, CPC, impressions, clicks, earnings.",
             "Never say publishers are Hosters.",
             "Never invent features that are not confirmed.",
-            "Answer in concise markdown with short paragraphs.",
+            "Answer in plain text.",
+            "Use **bold** for section titles; do not use markdown headings (#, ##, ###).",
+            "Lists are ok, keep them short.",
             "Keep answers under 160 words unless the user explicitly asks for detail.",
           ].join(" "),
         },
@@ -226,10 +228,20 @@ async function getGroqReply(prompt: string, history: AssistantMessage[], apiKey:
 
 function polishAssistantText(text: string) {
   let out = text;
+  // Fix common mojibake from mixed encodings.
   out = out.replace(/â€”/g, "—");
-  out = out.replace(/â†’/g, "->");
+  out = out.replace(/â†’/g, "→");
   out = out.replace(/â€œ/g, "\"");
   out = out.replace(/â€/g, "\"");
+  out = out.replace(/Â·/g, "·");
+
+  // Replace markdown headings with bold titles (the UI doesn't need #/###).
+  out = out.replace(/^#{1,6}\s+(.+)$/gm, (_match, title: string) => `**${String(title).trim()}**`);
+
+  // Normalize list bullets.
+  out = out.replace(/^\*\s+/gm, "- ");
+
+  // Transaction hash formatting: never prefix with #, show a bold label instead.
   out = out.replace(/#(0x[a-fA-F0-9]{64})/g, "$1");
   out = out.replace(/\bhash:\s*(0x[a-fA-F0-9]{64})/gi, "**Tx:** $1");
   out = out.replace(/\btx hash:\s*(0x[a-fA-F0-9]{64})/gi, "**Tx:** $1");
