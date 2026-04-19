@@ -20,7 +20,16 @@ export function Field({
 }
 
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={`${styles.input} ${props.className ?? ""}`.trim()} />;
+  return (
+    <input
+      {...props}
+      autoComplete={props.autoComplete ?? "off"}
+      autoCorrect={props.autoCorrect ?? "off"}
+      autoCapitalize={props.autoCapitalize ?? "off"}
+      spellCheck={props.spellCheck ?? false}
+      className={`${styles.input} ${props.className ?? ""}`.trim()}
+    />
+  );
 }
 
 export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
