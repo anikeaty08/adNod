@@ -1,6 +1,8 @@
 import { createPublicClient, defineChain, http } from "viem";
 import { arbitrumSepolia } from "viem/chains";
 import adRegistryAbi from "../src/lib/abi/registry-abi.json" with { type: "json" };
+import fhenixHelium from "../deployments/fhenixHelium.json" with { type: "json" };
+import fhenixArbitrumSepolia from "../deployments/fhenixArbitrumSepolia.json" with { type: "json" };
 import { FHELIUM_CHAIN_ID, getConfiguredChainId } from "./runtime.js";
 
 export type RegistryChainHealth = {
@@ -11,10 +13,22 @@ export type RegistryChainHealth = {
 };
 
 const chainId = getConfiguredChainId();
+
+function baseDeployment() {
+  const useHelium =
+    process.env.NEXT_PUBLIC_ADNODE_NETWORK === "fhenixHelium" ||
+    process.env.VITE_ADNODE_NETWORK === "fhenixHelium";
+  return useHelium ? (fhenixHelium as any) : (fhenixArbitrumSepolia as any);
+}
+
+const dep = baseDeployment();
+
 const adRegistryAddress = (process.env.VITE_ADREGISTRY_ADDRESS ||
-  process.env.NEXT_PUBLIC_AD_REGISTRY_ADDRESS) as `0x${string}` | undefined;
+  process.env.NEXT_PUBLIC_AD_REGISTRY_ADDRESS ||
+  dep?.adRegistry) as `0x${string}` | undefined;
 const adAnalyticsAddress = (process.env.VITE_ADANALYTICS_ADDRESS ||
-  process.env.NEXT_PUBLIC_AD_ANALYTICS_ADDRESS) as `0x${string}` | undefined;
+  process.env.NEXT_PUBLIC_AD_ANALYTICS_ADDRESS ||
+  dep?.adAnalytics) as `0x${string}` | undefined;
 
 const rpcUrl =
   process.env.VITE_FHENIX_RPC_URL ||
@@ -54,7 +68,7 @@ const publicClient = createPublicClient({
 
 function assertRegistryConfigured() {
   if (!adRegistryAddress) {
-    throw new Error("VITE_ADREGISTRY_ADDRESS is not configured on the server.");
+    throw new Error("AdRegistry address is not configured on the server.");
   }
 }
 
