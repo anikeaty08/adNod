@@ -4,13 +4,15 @@ import { createCampaign, getCampaignByChainId, getCampaigns, getDatabaseReady, s
 import { parseMultipartUpload, uploadBufferToPinata } from "./pinata.js";
 import { getAssistantReply, type AssistantMessage } from "./assistant.js";
 import { buildEmbedFrameHtml, buildEmbedScript, createEmbedFramePayload, getPublicCampaignById, getPublicCampaignBySlotId } from "./public-campaigns.js";
-import { assignSlotCampaign, createSlot, getSlots, sanitizeSlotMetadata } from "./slot-store.js";
+import { assignSlotCampaign, createSlot, getSlotByKey, getSlots, sanitizeSlotMetadata } from "./slot-store.js";
 import { assertSignedRequest } from "./request-auth.js";
 import { getAssignedCampaignId, getCampaignHoster, getRegistryChainHealth, getSlotDeveloper } from "./chain-state.js";
-import { buildMeasurementEventKey, buildMeasurementFingerprint, verifyMeasurementToken } from "./measurement.js";
+import { buildMeasurementEventKey, buildMeasurementFingerprint, consumeMeasurementNonce, hashPageUrl, verifyMeasurementToken } from "./measurement.js";
 import { recordMeasurement } from "./measurement-store.js";
-import { markMeasurementPending, replayPendingMeasurements, syncMeasurementToChain } from "./settlement-service.js";
+import { replayPendingMeasurements } from "./settlement-service.js";
 import { assertRuntimeSafety } from "./runtime.js";
+import { startSettlementReplayWorker } from "./settlement-worker.js";
+import { backfillSlotsFromChain } from "./slot-chain-sync.js";
 
 const app = express();
 const localhostOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
@@ -51,7 +53,7 @@ app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", origin);
     res.header("Vary", "Origin");
     res.header("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type,X-AdNode-Action,X-AdNode-Address,X-AdNode-Timestamp,X-AdNode-Signature");
+    res.header("Access-Control-Allow-Headers", "Content-Type,X-AdNode-Action,X-AdNode-Address,X-AdNode-Timestamp,X-AdNode-Signature,X-AdNode-Upload-Filename,X-AdNode-Upload-Size,X-AdNode-Upload-Type");
   }
 
   if (req.method === "OPTIONS") {
@@ -90,6 +92,11 @@ app.get("/api/campaigns/:chainCampaignId", async (req, res) => {
 
 app.get("/api/slots", async (_req, res) => {
   const slots = await getSlots();
+  try {
+    await backfillSlotsFromChain(slots as Array<Record<string, unknown>>);
+  } catch {
+    // Keep the endpoint usable when RPC is unavailable; DB rows still return.
+  }
   res.json(slots);
 });
 
@@ -109,16 +116,39 @@ app.get("/api/public-campaign", async (req, res) => {
   }
 });
 
+async function resolveEmbedSlot(req: Request) {
+  const rawSlotId = String(req.query.slotId ?? "");
+  const rawSlotKey = String(req.query.slotKey ?? "");
+  if (/^\d+$/.test(rawSlotId)) {
+    return { slotId: Number(rawSlotId), slotKey: rawSlotKey };
+  }
+  if (rawSlotKey) {
+    const slot = await getSlotByKey(rawSlotKey);
+    const chainSlotId = String((slot as { chainSlotId?: string } | null)?.chainSlotId ?? "");
+    if (/^\d+$/.test(chainSlotId)) return { slotId: Number(chainSlotId), slotKey: rawSlotKey };
+  }
+  return { slotId: 0, slotKey: rawSlotKey };
+}
+
+function embedContextFromRequest(req: Request, slotKey: string) {
+  return {
+    slotKey,
+    publisherOrigin: String(req.query.publisherOrigin ?? ""),
+    pageUrl: String(req.query.pageUrl ?? ""),
+    sessionId: String(req.query.sessionId ?? ""),
+  };
+}
+
 app.get("/api/embed", async (req, res) => {
   const mode = String(req.query.mode ?? "script");
-  const slotId = Number(req.query.slotId);
+  const { slotId, slotKey } = await resolveEmbedSlot(req);
   const hasSlotId = Number.isFinite(slotId) && slotId > 0;
 
   if (!hasSlotId) {
     res
       .status(400)
       .type(mode === "frame" ? "text/html" : "application/javascript")
-      .send(mode === "frame" ? "<p>AdNode slotId is required.</p>" : "console.error('AdNode slotId is required.');");
+      .send(mode === "frame" ? "<p>AdNode slot is required.</p>" : "console.error('AdNode slot is required.');");
     return;
   }
 
@@ -126,8 +156,9 @@ app.get("/api/embed", async (req, res) => {
     try {
       const campaign = await getPublicCampaignBySlotId(slotId);
       const origin = `${req.protocol}://${req.get("host")}`;
-      const payload = createEmbedFramePayload(campaign, origin);
-      res.type("text/html").send(buildEmbedFrameHtml(payload.campaign, { origin: payload.origin, measurementToken: payload.measurementToken }));
+      const context = embedContextFromRequest(req, slotKey);
+      const payload = createEmbedFramePayload(campaign, origin, context);
+      res.type("text/html").send(buildEmbedFrameHtml(payload.campaign, { origin: payload.origin, measurementToken: payload.measurementToken, pageUrl: context.pageUrl, publisherOrigin: context.publisherOrigin }));
     } catch (error) {
       res.status(404).type("text/html").send(`<p>${error instanceof Error ? error.message : "Campaign not found."}</p>`);
     }
@@ -135,36 +166,37 @@ app.get("/api/embed", async (req, res) => {
   }
 
   const origin = `${req.protocol}://${req.get("host")}`;
-  res.type("application/javascript").send(buildEmbedScript(origin, { slotId }));
+  res.type("application/javascript").send(buildEmbedScript(origin, slotKey ? { slotKey, slotId } : { slotId }));
 });
 
 app.get("/api/embed.js", async (req, res) => {
-  const slotId = Number(req.query.slotId);
+  const { slotId, slotKey } = await resolveEmbedSlot(req);
   const hasSlotId = Number.isFinite(slotId) && slotId > 0;
 
   if (!hasSlotId) {
-    res.status(400).type("application/javascript").send("console.error('AdNode slotId is required.');");
+    res.status(400).type("application/javascript").send("console.error('AdNode slot is required.');");
     return;
   }
 
   const origin = `${req.protocol}://${req.get("host")}`;
-  res.type("application/javascript").send(buildEmbedScript(origin, { slotId }));
+  res.type("application/javascript").send(buildEmbedScript(origin, slotKey ? { slotKey, slotId } : { slotId }));
 });
 
 app.get("/api/embed-frame", async (req, res) => {
-  const slotId = Number(req.query.slotId);
+  const { slotId, slotKey } = await resolveEmbedSlot(req);
   const hasSlotId = Number.isFinite(slotId) && slotId > 0;
 
   if (!hasSlotId) {
-    res.status(400).type("text/html").send("<p>AdNode slotId is required.</p>");
+    res.status(400).type("text/html").send("<p>AdNode slot is required.</p>");
     return;
   }
 
   try {
     const campaign = await getPublicCampaignBySlotId(slotId);
     const origin = `${req.protocol}://${req.get("host")}`;
-    const payload = createEmbedFramePayload(campaign, origin);
-    res.type("text/html").send(buildEmbedFrameHtml(payload.campaign, { origin: payload.origin, measurementToken: payload.measurementToken }));
+    const context = embedContextFromRequest(req, slotKey);
+    const payload = createEmbedFramePayload(campaign, origin, context);
+    res.type("text/html").send(buildEmbedFrameHtml(payload.campaign, { origin: payload.origin, measurementToken: payload.measurementToken, pageUrl: context.pageUrl, publisherOrigin: context.publisherOrigin }));
   } catch (error) {
     res.status(404).type("text/html").send(`<p>${error instanceof Error ? error.message : "Campaign not found."}</p>`);
   }
@@ -176,6 +208,7 @@ app.post("/api/measure", rateLimit(120, "measure"), async (req, res) => {
   const eventType = String(body.eventType ?? "");
   const pageUrl = String(body.pageUrl ?? "");
   const referrer = String(body.referrer ?? "");
+  const publisherOrigin = String(body.publisherOrigin ?? "");
 
   if (!token || (eventType !== "impression" && eventType !== "click")) {
     res.status(400).json({ error: "token and valid eventType are required." });
@@ -202,6 +235,21 @@ app.post("/api/measure", rateLimit(120, "measure"), async (req, res) => {
     res.status(409).json({ error: "Embed token campaign assignment no longer matches slot state." });
     return;
   }
+  if (verifiedToken.publisherOrigin && publisherOrigin && verifiedToken.publisherOrigin !== publisherOrigin) {
+    res.status(401).json({ error: "Measurement token origin mismatch." });
+    return;
+  }
+  if (verifiedToken.pageUrlHash && hashPageUrl(pageUrl) !== verifiedToken.pageUrlHash) {
+    res.status(401).json({ error: "Measurement token page mismatch." });
+    return;
+  }
+
+  try {
+    await consumeMeasurementNonce(verifiedToken, eventType as "impression" | "click");
+  } catch (error) {
+    res.status(202).json({ ok: true, duplicate: true, error: error instanceof Error ? error.message : "Duplicate measurement." });
+    return;
+  }
 
   const userAgent = String(req.headers["user-agent"] ?? "");
   const remoteAddress = String(req.socket.remoteAddress ?? "");
@@ -217,6 +265,7 @@ app.post("/api/measure", rateLimit(120, "measure"), async (req, res) => {
     chainSlotId: campaign.slotId,
     eventType,
     fingerprint,
+    nonce: verifiedToken.nonce,
   });
 
   const { duplicate, record } = await recordMeasurement({
@@ -229,6 +278,11 @@ app.post("/api/measure", rateLimit(120, "measure"), async (req, res) => {
     pageUrl,
     referrer,
     fingerprint,
+    settlementId: eventKey,
+    sessionId: verifiedToken.sessionId,
+    nonce: verifiedToken.nonce,
+    publisherOrigin,
+    pageUrlHash: verifiedToken.pageUrlHash,
   });
 
   if (duplicate) {
@@ -236,18 +290,7 @@ app.post("/api/measure", rateLimit(120, "measure"), async (req, res) => {
     return;
   }
 
-  try {
-    const result = await syncMeasurementToChain(record);
-    res.status(202).json({ ok: true, duplicate: false, settlement: result });
-  } catch (error) {
-    await markMeasurementPending(record, error);
-    res.status(202).json({
-      ok: true,
-      duplicate: false,
-      settlement: { status: "pending_chain" },
-      warning: error instanceof Error ? error.message : "Chain sync failed.",
-    });
-  }
+  res.status(202).json({ ok: true, duplicate: false, status: record.status });
 });
 
 app.post("/api/settlement/replay", rateLimit(15, "replay"), async (req, res) => {
@@ -400,21 +443,28 @@ app.post("/api/assistant/chat", rateLimit(30, "assistant-chat"), async (req, res
   }
 });
 
-app.post("/api/uploads/creative", async (req, res) => {
+async function handleCreativeUpload(req: Request, res: Response) {
   try {
+    const signedMeta = {
+      filename: String(req.headers["x-adnode-upload-filename"] ?? ""),
+      size: Number(req.headers["x-adnode-upload-size"] ?? 0),
+      type: String(req.headers["x-adnode-upload-type"] ?? "application/octet-stream"),
+    };
+    await assertSignedRequest(req.headers, "uploads:creative", signedMeta);
     const file = await parseMultipartUpload(req);
-    await assertSignedRequest(req.headers, "uploads:creative", {
-      filename: file.filename,
-      size: file.buffer.byteLength,
-      type: file.mimeType,
-    });
+    if (file.filename !== signedMeta.filename || file.buffer.byteLength !== signedMeta.size || file.mimeType !== signedMeta.type) {
+      throw new Error("Upload metadata does not match authorization payload.");
+    }
     const uri = await uploadBufferToPinata(file);
     res.status(201).json({ uri });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Creative upload failed.";
     res.status(message.toLowerCase().includes("authorization") || message.toLowerCase().includes("unauthorized") || message.toLowerCase().includes("signature") ? 401 : 400).json({ error: message });
   }
-});
+}
+
+app.post("/api/uploads/creative", handleCreativeUpload);
+app.post("/api/upload-creative", handleCreativeUpload);
 
 const port = Number(process.env.PORT || 4000);
 
@@ -432,11 +482,4 @@ app.listen(port, () => {
   console.log(`AdNode API listening on http://localhost:${port}`);
 });
 
-if (process.env.ADNODE_SETTLEMENT_REPLAY_INTERVAL_MS) {
-  const intervalMs = Math.max(15_000, Number(process.env.ADNODE_SETTLEMENT_REPLAY_INTERVAL_MS));
-  setInterval(() => {
-    void replayPendingMeasurements().catch((error) => {
-      console.error("AdNode settlement replay failed:", error instanceof Error ? error.message : error);
-    });
-  }, intervalMs);
-}
+startSettlementReplayWorker();

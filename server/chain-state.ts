@@ -1,9 +1,7 @@
 import { createPublicClient, defineChain, http } from "viem";
 import { arbitrumSepolia } from "viem/chains";
 import adRegistryAbi from "../lib/abi/registry-abi.json" with { type: "json" };
-import fhenixHelium from "../deployments/fhenixHelium.json" with { type: "json" };
-import fhenixArbitrumSepolia from "../deployments/fhenixArbitrumSepolia.json" with { type: "json" };
-import { FHELIUM_CHAIN_ID, getConfiguredChainId } from "./runtime.js";
+import { FHELIUM_CHAIN_ID, getConfiguredChainId, getDeploymentConfig } from "./runtime.js";
 
 export type RegistryChainHealth = {
   chainId: number;
@@ -13,29 +11,16 @@ export type RegistryChainHealth = {
 };
 
 const chainId = getConfiguredChainId();
-
-function baseDeployment() {
-  const useHelium =
-    process.env.NEXT_PUBLIC_ADNODE_NETWORK === "fhenixHelium" ||
-    process.env.VITE_ADNODE_NETWORK === "fhenixHelium";
-  return useHelium ? (fhenixHelium as any) : (fhenixArbitrumSepolia as any);
-}
-
-const dep = baseDeployment();
+const deployment = getDeploymentConfig({ allowUndeployed: true });
 
 const adRegistryAddress = (process.env.VITE_ADREGISTRY_ADDRESS ||
   process.env.NEXT_PUBLIC_AD_REGISTRY_ADDRESS ||
-  dep?.adRegistry) as `0x${string}` | undefined;
+  deployment.adRegistry) as `0x${string}` | undefined;
 const adAnalyticsAddress = (process.env.VITE_ADANALYTICS_ADDRESS ||
   process.env.NEXT_PUBLIC_AD_ANALYTICS_ADDRESS ||
-  dep?.adAnalytics) as `0x${string}` | undefined;
+  deployment.adAnalytics) as `0x${string}` | undefined;
 
-const rpcUrl =
-  process.env.VITE_FHENIX_RPC_URL ||
-  process.env.ARBITRUM_SEPOLIA_RPC_URL ||
-  (chainId === arbitrumSepolia.id
-    ? arbitrumSepolia.rpcUrls.default.http[0]
-    : "https://api.helium.fhenix.zone");
+const rpcUrl = deployment.rpcUrl;
 
 const chain =
   chainId === arbitrumSepolia.id
@@ -94,6 +79,27 @@ export async function getNextCampaignId() {
     abi: adRegistryAbi as any,
     functionName: "nextCampaignId" as any,
   })) as bigint;
+}
+
+export async function getNextSlotId() {
+  const registryAddress = getRegistryAddress();
+  return (await publicClient.readContract({
+    address: registryAddress,
+    abi: adRegistryAbi as any,
+    functionName: "nextSlotId" as any,
+  })) as bigint;
+}
+
+export async function getSlotPublicInfo(chainSlotId: string) {
+  const registryAddress = getRegistryAddress();
+  const [developer, siteName, category, active, assignedCampaignId] = (await publicClient.readContract({
+    address: registryAddress,
+    abi: adRegistryAbi as any,
+    functionName: "slots" as any,
+    args: [BigInt(chainSlotId)],
+  })) as [string, string, string, boolean, bigint];
+
+  return { developer, siteName, category, active, assignedCampaignId: assignedCampaignId.toString() };
 }
 
 export async function getCampaignPublicInfo(chainCampaignId: string) {

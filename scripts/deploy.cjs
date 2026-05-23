@@ -32,13 +32,30 @@ async function main() {
     await (await registry.setAccessApprover(accessApprover)).wait();
   }
 
+  const registryDeployment = await registry.deploymentTransaction()?.wait();
+  const analyticsDeployment = await analytics.deploymentTransaction()?.wait();
+  const wrapperDeployment = await payoutWrapper.deploymentTransaction()?.wait();
+
   const deployment = {
     network: network.name,
+    chainId: Number(network.config.chainId || (await ethers.provider.getNetwork()).chainId),
+    explorerUrl:
+      network.name === "fhenixHelium"
+        ? "https://explorer.helium.fhenix.zone"
+        : "https://sepolia.arbiscan.io",
     payoutWrapper: await payoutWrapper.getAddress(),
     wrappedNativeToken: wrappedNativeAddress,
     adRegistry: await registry.getAddress(),
     adAnalytics: await analytics.getAddress(),
     accessApprover: accessApprover || null,
+    deployer: deployer.address,
+    blockNumber: analyticsDeployment?.blockNumber ?? registryDeployment?.blockNumber ?? wrapperDeployment?.blockNumber ?? null,
+    txHashes: {
+      payoutWrapper: payoutWrapper.deploymentTransaction()?.hash,
+      adRegistry: registry.deploymentTransaction()?.hash,
+      adAnalytics: analytics.deploymentTransaction()?.hash,
+    },
+    abiVersion: "non-replayable-settlement-v1",
     deployedAt: new Date().toISOString(),
   };
 

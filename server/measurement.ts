@@ -1,10 +1,18 @@
 import crypto from "node:crypto";
+import { connectDatabase } from "./db.js";
+import { MeasurementNonceModel } from "./models/MeasurementNonce.js";
+import { strictModeEnabled } from "./runtime.js";
 
-const TOKEN_TTL_MS = 6 * 60 * 60 * 1000;
+const TOKEN_TTL_MS = 10 * 60 * 1000;
 
 interface MeasurementTokenPayload {
   chainCampaignId: string;
   chainSlotId: string;
+  slotKey: string;
+  publisherOrigin: string;
+  pageUrlHash: string;
+  sessionId: string;
+  nonce: string;
   issuedAt: number;
   expiresAt: number;
 }
@@ -49,6 +57,39 @@ export function verifyMeasurementToken(token: string) {
   return payload;
 }
 
+const memoryNonceUsage = new Set<string>();
+
+export async function consumeMeasurementNonce(payload: MeasurementTokenPayload, eventType: "impression" | "click") {
+  const nonceKey = `${payload.nonce}:${eventType}`;
+  try {
+    await connectDatabase();
+    await MeasurementNonceModel.create({
+      nonce: payload.nonce,
+      sessionId: payload.sessionId,
+      eventType,
+      expiresAt: new Date(payload.expiresAt),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes("E11000") || (error as { code?: number })?.code === 11000) {
+      throw new Error("Measurement token replay rejected.");
+    }
+    if (strictModeEnabled()) throw error;
+    if (memoryNonceUsage.has(nonceKey)) {
+      throw new Error("Measurement token replay rejected.");
+    }
+    memoryNonceUsage.add(nonceKey);
+  }
+}
+
+export function hashPageUrl(pageUrl: string) {
+  return crypto.createHash("sha256").update(pageUrl.trim()).digest("hex");
+}
+
+export function createMeasurementNonce() {
+  return crypto.randomBytes(16).toString("base64url");
+}
+
 export function buildMeasurementFingerprint(input: {
   remoteAddress: string;
   userAgent: string;
@@ -67,7 +108,7 @@ export function buildMeasurementEventKey(input: {
   chainSlotId: string;
   eventType: "impression" | "click";
   fingerprint: string;
+  nonce?: string;
 }) {
-  const tenMinuteBucket = Math.floor(Date.now() / (10 * 60 * 1000));
-  return `${input.chainCampaignId}:${input.chainSlotId}:${input.eventType}:${tenMinuteBucket}:${input.fingerprint}`;
+  return `${input.chainCampaignId}:${input.chainSlotId}:${input.eventType}:${input.nonce || input.fingerprint}`;
 }

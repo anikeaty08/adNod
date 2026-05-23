@@ -12,6 +12,11 @@ export interface MeasurementRecord {
   pageUrl: string;
   referrer: string;
   fingerprint: string;
+  settlementId: string;
+  sessionId?: string;
+  nonce?: string;
+  publisherOrigin?: string;
+  pageUrlHash?: string;
   status: "accepted" | "duplicate" | "settled" | "pending_chain";
   settlementTxHash?: string;
   lastError?: string;
@@ -23,16 +28,19 @@ const memoryMeasurements = new Map<string, MeasurementRecord>();
 export async function recordMeasurement(payload: Omit<MeasurementRecord, "status">) {
   try {
     await connectDatabase();
-    const existing = await MeasurementModel.findOne({ eventKey: payload.eventKey }).lean();
-    if (existing) {
+    try {
+      const created = await MeasurementModel.create({
+        ...payload,
+        status: "accepted",
+      });
+      return { duplicate: false, record: created.toObject() as MeasurementRecord };
+    } catch (error) {
+      if ((error as { code?: number })?.code !== 11000) throw error;
+      const existing = await MeasurementModel.findOne({
+        $or: [{ eventKey: payload.eventKey }, { settlementId: payload.settlementId }],
+      }).lean();
       return { duplicate: true, record: existing as unknown as MeasurementRecord };
     }
-
-    const created = await MeasurementModel.create({
-      ...payload,
-      status: "accepted",
-    });
-    return { duplicate: false, record: created.toObject() as MeasurementRecord };
   } catch (error) {
     if (strictModeEnabled()) throw error;
     if (memoryMeasurements.has(payload.eventKey)) {

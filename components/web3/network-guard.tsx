@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
-import { ADNODE_CHAIN_ID } from "@/lib/chain";
+import { ADNODE_CHAIN_ID, ADNODE_NETWORK_NAME } from "@/lib/chain";
 import styles from "@/styles/guard.module.css";
 
 export function NetworkGuard({ children }: { children: React.ReactNode }) {
@@ -19,7 +19,7 @@ export function NetworkGuard({ children }: { children: React.ReactNode }) {
     <div className={styles.overlay}>
       <div className={styles.card}>
         <p className={styles.label}>Wrong network</p>
-        <h2>Switch to Arbitrum Sepolia</h2>
+        <h2>Switch to {ADNODE_NETWORK_NAME}</h2>
         <p>This app is chain-locked. Please switch to continue.</p>
         <button
           className={styles.cta}

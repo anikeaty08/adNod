@@ -56,6 +56,7 @@ contract AdRegistry is Ownable, ReentrancyGuard {
     mapping(address => mapping(address => bool)) private payoutOperators;
     mapping(address => address) private payoutRecipients;
     mapping(address => bool) public settlementManagers;
+    mapping(bytes32 => bool) public settledEventOrEpoch;
     IAdNodePayoutWrapper public immutable payoutWrapper;
 
     /// @notice Machine approver for publisher access requests (slot-scoped).
@@ -80,7 +81,7 @@ contract AdRegistry is Ownable, ReentrancyGuard {
     event SlotStatusUpdated(uint256 indexed id, bool active);
     event CampaignAssignedToSlot(uint256 indexed slotId, uint256 indexed campaignId);
     event SettlementManagerUpdated(address indexed account, bool allowed);
-    event DeveloperPayoutReserved(uint256 indexed campaignId, uint256 indexed slotId, address indexed developer, uint256 amount);
+    event DeveloperPayoutReserved(uint256 indexed campaignId, uint256 indexed slotId, bytes32 indexed settlementId, address developer, uint256 amount);
     event PayoutOperatorUpdated(address indexed developer, address indexed operator, bool approved);
     event PayoutRecipientUpdated(address indexed developer, address indexed recipient);
     event DeveloperEarningsClaimed(address indexed developer, address indexed recipient, address indexed caller, uint256 amount);
@@ -316,10 +317,12 @@ contract AdRegistry is Ownable, ReentrancyGuard {
         emit SettlementManagerUpdated(account, allowed);
     }
 
-    function reserveDeveloperPayout(uint256 campaignId, uint256 slotId, uint256 amount) external onlySettlementManager returns (address developer) {
+    function reserveDeveloperPayout(uint256 campaignId, uint256 slotId, uint256 amount, bytes32 settlementId) external onlySettlementManager returns (address developer) {
         Campaign storage campaign = campaigns[campaignId];
         Slot storage slot = slots[slotId];
 
+        require(settlementId != bytes32(0), "Invalid settlement id");
+        require(!settledEventOrEpoch[settlementId], "Settlement already processed");
         require(campaign.hoster != address(0), "Campaign missing");
         require(slot.developer != address(0), "Slot missing");
         require(campaign.active, "Campaign inactive");
@@ -340,11 +343,12 @@ contract AdRegistry is Ownable, ReentrancyGuard {
         }
 
         developer = slot.developer;
+        settledEventOrEpoch[settlementId] = true;
         campaign.availableFunds -= amount;
         campaign.totalSettled += amount;
         claimableEarnings[developer] += amount;
 
-        emit DeveloperPayoutReserved(campaignId, slotId, developer, amount);
+        emit DeveloperPayoutReserved(campaignId, slotId, settlementId, developer, amount);
     }
 
     function setPayoutOperator(address operator, bool approved) external {

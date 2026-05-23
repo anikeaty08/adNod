@@ -20,4 +20,7 @@ const CampaignSchema = new Schema(
   },
 );
 
+CampaignSchema.index({ advertiser: 1, createdAt: -1 });
+CampaignSchema.index({ category: 1, createdAt: -1 });
+
 export const CampaignModel = models.Campaign || model("Campaign", CampaignSchema);

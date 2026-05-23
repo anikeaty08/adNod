@@ -13,6 +13,11 @@ const MeasurementSchema = new Schema(
     pageUrl: { type: String, default: "" },
     referrer: { type: String, default: "" },
     fingerprint: { type: String, required: true },
+    settlementId: { type: String, required: true },
+    sessionId: { type: String, default: "" },
+    nonce: { type: String, default: "" },
+    publisherOrigin: { type: String, default: "" },
+    pageUrlHash: { type: String, default: "" },
     status: { type: String, enum: ["accepted", "duplicate", "settled", "pending_chain"], default: "accepted" },
     settlementTxHash: { type: String, default: "" },
     lastError: { type: String, default: "" },
@@ -22,5 +27,9 @@ const MeasurementSchema = new Schema(
     timestamps: true,
   },
 );
+
+MeasurementSchema.index({ chainCampaignId: 1, chainSlotId: 1, eventType: 1, settlementId: 1 }, { unique: true });
+MeasurementSchema.index({ status: 1, createdAt: 1 });
+MeasurementSchema.index({ chainCampaignId: 1, chainSlotId: 1, eventType: 1, createdAt: 1 });
 
 export const MeasurementModel = models.Measurement || model("Measurement", MeasurementSchema);

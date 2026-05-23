@@ -9,9 +9,10 @@ import { readJsonBody } from "../server/http-body.js";
 import { parseMultipartUpload, uploadBufferToPinata } from "../server/pinata.js";
 import { getAssistantReply, type AssistantMessage } from "../server/assistant.js";
 import { getPublicCampaignById, getPublicCampaignBySlotId, createEmbedFramePayload, buildEmbedFrameHtml, buildEmbedScript } from "../server/public-campaigns.js";
-import { verifyMeasurementToken, buildMeasurementFingerprint, buildMeasurementEventKey } from "../server/measurement.js";
+import { verifyMeasurementToken, buildMeasurementFingerprint, buildMeasurementEventKey, consumeMeasurementNonce, hashPageUrl } from "../server/measurement.js";
 import { recordMeasurement } from "../server/measurement-store.js";
-import { markMeasurementPending, syncMeasurementToChain, replayPendingMeasurements } from "../server/settlement-service.js";
+import { replayPendingMeasurements } from "../server/settlement-service.js";
+import { backfillSlotsFromChain } from "../server/slot-chain-sync.js";
 import { decodeEventLog, formatEther, parseEther } from "viem";
 import adRegistryAbi from "../lib/abi/registry-abi.json" with { type: "json" };
 
@@ -309,9 +310,10 @@ async function handleSlots(req: IncomingMessage, res: ServerResponse) {
   if (req.method === "GET") {
     const slots = (await getSlots()) as Array<Record<string, unknown>>;
 
-    // Best-effort: keep assignedCampaignId fresh from the chain so Publisher can act without manual syncing.
+    // Best-effort chain-led inventory: first run catches up from chain, later requests sync only new slots.
     try {
-      await getRegistryChainHealth();
+      await backfillSlotsFromChain(slots);
+
       const slice = slots.slice(0, 60);
       await Promise.all(
         slice.map(async (s) => {
@@ -518,10 +520,22 @@ async function handleEmbed(req: IncomingMessage, res: ServerResponse) {
     try {
       const campaign = await getPublicCampaignBySlotId(slotId as number);
       const origin = `${url.protocol}//${url.host}`;
-      const payload = createEmbedFramePayload(campaign, origin);
+      const payload = createEmbedFramePayload(campaign, origin, {
+        slotKey: rawSlotKey || "",
+        publisherOrigin: url.searchParams.get("publisherOrigin") || "",
+        pageUrl: url.searchParams.get("pageUrl") || "",
+        sessionId: url.searchParams.get("sessionId") || "",
+      });
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.statusCode = 200;
-      res.end(buildEmbedFrameHtml(payload.campaign, { origin: payload.origin, measurementToken: payload.measurementToken }));
+      res.end(
+        buildEmbedFrameHtml(payload.campaign, {
+          origin: payload.origin,
+          measurementToken: payload.measurementToken,
+          pageUrl: url.searchParams.get("pageUrl") || "",
+          publisherOrigin: url.searchParams.get("publisherOrigin") || "",
+        }),
+      );
     } catch (error) {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.statusCode = 404;
@@ -551,6 +565,7 @@ async function handleMeasure(req: IncomingMessage, res: ServerResponse) {
   const eventType = String(body.eventType ?? "");
   const pageUrl = String(body.pageUrl ?? "");
   const referrer = String(body.referrer ?? "");
+  const publisherOrigin = String(body.publisherOrigin ?? "");
 
   if (!token || (eventType !== "impression" && eventType !== "click")) {
     return sendJson(res, 400, { error: "token and valid eventType are required." });
@@ -573,6 +588,18 @@ async function handleMeasure(req: IncomingMessage, res: ServerResponse) {
   if (campaign.id !== verifiedToken.chainCampaignId) {
     return sendJson(res, 409, { error: "Embed token campaign assignment no longer matches slot state." });
   }
+  if (verifiedToken.publisherOrigin && publisherOrigin && verifiedToken.publisherOrigin !== publisherOrigin) {
+    return sendJson(res, 401, { error: "Measurement token origin mismatch." });
+  }
+  if (verifiedToken.pageUrlHash && hashPageUrl(pageUrl) !== verifiedToken.pageUrlHash) {
+    return sendJson(res, 401, { error: "Measurement token page mismatch." });
+  }
+
+  try {
+    await consumeMeasurementNonce(verifiedToken, eventType as "impression" | "click");
+  } catch (error) {
+    return sendJson(res, 202, { ok: true, duplicate: true, error: error instanceof Error ? error.message : "Duplicate measurement." });
+  }
 
   const remoteAddress = String(req.socket?.remoteAddress ?? "");
   const userAgent = Array.isArray(req.headers["user-agent"]) ? req.headers["user-agent"][0] ?? "" : String(req.headers["user-agent"] ?? "");
@@ -588,63 +615,28 @@ async function handleMeasure(req: IncomingMessage, res: ServerResponse) {
     chainSlotId: campaign.slotId,
     eventType,
     fingerprint,
+    nonce: verifiedToken.nonce,
   });
 
-  let duplicate = false;
-  let record: Awaited<ReturnType<typeof recordMeasurement>>["record"];
-  try {
-    const result = await recordMeasurement({
-      eventKey,
-      chainCampaignId: campaign.id,
-      chainSlotId: campaign.slotId,
-      eventType,
-      pricingModel: campaign.pricingModel,
-      rate: campaign.rate,
-      pageUrl,
-      referrer,
-      fingerprint,
-    });
-    duplicate = result.duplicate;
-    record = result.record;
-  } catch (error) {
-    // In strict-mode deployments, DB failures would otherwise cause a hard 500.
-    // Treat measurement as accepted and attempt chain sync; embeds should never crash the page.
-    duplicate = false;
-    record = {
-      eventKey,
-      chainCampaignId: campaign.id,
-      chainSlotId: campaign.slotId,
-      eventType: eventType as any,
-      pricingModel: campaign.pricingModel as any,
-      rate: campaign.rate,
-      pageUrl,
-      referrer,
-      fingerprint,
-      status: "accepted",
-      settlementTxHash: "",
-      lastError: error instanceof Error ? error.message : "Measurement store failed.",
-      settledAt: null,
-    } as any;
-  }
+  const { duplicate, record } = await recordMeasurement({
+    eventKey,
+    chainCampaignId: campaign.id,
+    chainSlotId: campaign.slotId,
+    eventType,
+    pricingModel: campaign.pricingModel,
+    rate: campaign.rate,
+    pageUrl,
+    referrer,
+    fingerprint,
+    settlementId: eventKey,
+    sessionId: verifiedToken.sessionId,
+    nonce: verifiedToken.nonce,
+    publisherOrigin,
+    pageUrlHash: verifiedToken.pageUrlHash,
+  });
 
   if (duplicate) return sendJson(res, 202, { ok: true, duplicate: true });
-
-  try {
-    const result = await syncMeasurementToChain(record);
-    return sendJson(res, 202, { ok: true, duplicate: false, settlement: result });
-  } catch (error) {
-    try {
-      await markMeasurementPending(record, error);
-    } catch {
-      // ignore
-    }
-    return sendJson(res, 202, {
-      ok: true,
-      duplicate: false,
-      settlement: { status: "pending_chain" },
-      warning: error instanceof Error ? error.message : "Chain sync failed.",
-    });
-  }
+  return sendJson(res, 202, { ok: true, duplicate: false, status: record.status });
 }
 
 async function handleHealth(_req: IncomingMessage, res: ServerResponse) {
@@ -664,12 +656,16 @@ async function handleUploadCreative(req: IncomingMessage, res: ServerResponse) {
   if (req.method !== "POST") return methodNotAllowed(res, "POST");
 
   try {
+    const signedMeta = {
+      filename: String(req.headers["x-adnode-upload-filename"] ?? ""),
+      size: Number(req.headers["x-adnode-upload-size"] ?? 0),
+      type: String(req.headers["x-adnode-upload-type"] ?? "application/octet-stream"),
+    };
+    await assertSignedRequest(req.headers, "uploads:creative", signedMeta);
     const file = await parseMultipartUpload(req);
-    await assertSignedRequest(req.headers, "uploads:creative", {
-      filename: file.filename,
-      size: file.buffer.byteLength,
-      type: file.mimeType,
-    });
+    if (file.filename !== signedMeta.filename || file.buffer.byteLength !== signedMeta.size || file.mimeType !== signedMeta.type) {
+      throw new Error("Upload metadata does not match authorization payload.");
+    }
     const uri = await uploadBufferToPinata(file);
     return sendJson(res, 201, { uri });
   } catch (error) {
@@ -703,6 +699,27 @@ async function handleSettlementReplay(req: IncomingMessage, res: ServerResponse)
   }
 }
 
+async function handleSettlementWorker(req: IncomingMessage, res: ServerResponse) {
+  if (req.method !== "GET" && req.method !== "POST") return methodNotAllowed(res, "GET, POST");
+
+  const secret = process.env.CRON_SECRET || process.env.ADNODE_SETTLEMENT_CRON_SECRET;
+  if (!secret) {
+    return sendJson(res, 503, { error: "CRON_SECRET or ADNODE_SETTLEMENT_CRON_SECRET is required for settlement worker." });
+  }
+
+  const authorization = Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization;
+  if (authorization !== `Bearer ${secret}`) {
+    return sendJson(res, 401, { error: "Unauthorized settlement worker request." });
+  }
+
+  try {
+    const summary = await replayPendingMeasurements();
+    return sendJson(res, 200, { ok: true, ...summary });
+  } catch (error) {
+    return sendJson(res, 500, { error: error instanceof Error ? error.message : "Settlement worker failed." });
+  }
+}
+
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   const pathname = getPathname(req);
 
@@ -722,6 +739,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if (p === "/measure") return await handleMeasure(req, res);
     if (p === "/upload-creative") return await handleUploadCreative(req, res);
     if (p === "/settlement-replay") return await handleSettlementReplay(req, res);
+    if (p === "/settlement-worker") return await handleSettlementWorker(req, res);
     if (p === "/assistant-chat") return await handleAssistantChat(req, res);
     if (p === "/assistant") return await handleAssistant(req, res);
 

@@ -7,11 +7,14 @@ interface ParsedUpload {
   mimeType: string;
 }
 
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "video/mp4", "video/webm"]);
+
 export async function parseMultipartUpload(req: IncomingMessage): Promise<ParsedUpload> {
   return new Promise((resolve, reject) => {
     const busboy = Busboy({
       headers: req.headers,
-      limits: { files: 1, fileSize: 50 * 1024 * 1024 },
+      limits: { files: 1, fileSize: MAX_UPLOAD_BYTES },
     });
 
     let chunks: Buffer[] = [];
@@ -23,13 +26,18 @@ export async function parseMultipartUpload(req: IncomingMessage): Promise<Parsed
       hasFile = true;
       filename = info.filename || filename;
       mimeType = info.mimeType || mimeType;
+      if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+        reject(new Error("Unsupported creative file type."));
+        file.resume();
+        return;
+      }
 
       file.on("data", (chunk) => {
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
       });
 
       file.on("limit", () => {
-        reject(new Error("Upload exceeds the 50MB limit."));
+        reject(new Error("Upload exceeds the 10MB limit."));
       });
     });
 
@@ -40,8 +48,14 @@ export async function parseMultipartUpload(req: IncomingMessage): Promise<Parsed
         return;
       }
 
+      const buffer = Buffer.concat(chunks);
+      if (buffer.byteLength > MAX_UPLOAD_BYTES) {
+        reject(new Error("Upload exceeds the 10MB limit."));
+        return;
+      }
+
       resolve({
-        buffer: Buffer.concat(chunks),
+        buffer,
         filename,
         mimeType,
       });

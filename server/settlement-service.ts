@@ -3,7 +3,7 @@ import { Encryptable } from "@cofhe/sdk";
 import { createCofheClient, createCofheConfig } from "@cofhe/sdk/node";
 import { arbSepolia } from "@cofhe/sdk/chains";
 import { privateKeyToAccount } from "viem/accounts";
-import { createPublicClient, createWalletClient, defineChain, formatEther, http, parseEther } from "viem";
+import { createPublicClient, createWalletClient, defineChain, formatEther, http, keccak256, parseEther, stringToBytes } from "viem";
 import { writeContract } from "viem/actions";
 import adAnalyticsAbi from "../lib/abi/analytics-abi.json" with { type: "json" };
 import adRegistryAbi from "../lib/abi/registry-abi.json" with { type: "json" };
@@ -98,6 +98,20 @@ function computePayoutWei(rate: string, billingUnits: bigint) {
   return wei;
 }
 
+function toSettlementId(record: MeasurementRecord, suffix = "") {
+  return keccak256(
+    stringToBytes(
+      [
+        record.chainCampaignId,
+        record.chainSlotId,
+        record.eventType,
+        record.settlementId || record.eventKey,
+        suffix,
+      ].join(":"),
+    ),
+  );
+}
+
 const MAX_CPM_UNITS_PER_SETTLEMENT = 10_000n;
 
 async function assertPayoutMatchesOnChainTerms(
@@ -157,13 +171,14 @@ export async function syncMeasurementToChain(record: MeasurementRecord) {
 
   const analyticsAddress = adAnalyticsAddress!;
   let payoutWei = 0n;
+  const eventId = toSettlementId(record, "event");
 
   if (record.eventType === "impression") {
     await writeContract(walletClient, {
       address: analyticsAddress,
       abi: adAnalyticsAbi,
       functionName: "recordImpression",
-      args: [BigInt(record.chainCampaignId)],
+      args: [BigInt(record.chainCampaignId), eventId],
       chain,
       account,
     });
@@ -172,7 +187,6 @@ export async function syncMeasurementToChain(record: MeasurementRecord) {
       const state = await incrementAcceptedImpression(record.chainCampaignId, record.chainSlotId);
       const newlyBillableUnits = Math.floor(state.acceptedImpressions / 1000) - state.settledImpressionUnits;
       if (newlyBillableUnits > 0) {
-        await markSettledImpressionUnits(record.chainCampaignId, record.chainSlotId, newlyBillableUnits);
         payoutWei = computePayoutWei(record.rate, BigInt(newlyBillableUnits));
       }
     }
@@ -183,7 +197,7 @@ export async function syncMeasurementToChain(record: MeasurementRecord) {
       address: analyticsAddress,
       abi: adAnalyticsAbi,
       functionName: "recordClick",
-      args: [BigInt(record.chainCampaignId)],
+      args: [BigInt(record.chainCampaignId), eventId],
       chain,
       account,
     });
@@ -200,10 +214,16 @@ export async function syncMeasurementToChain(record: MeasurementRecord) {
       address: analyticsAddress,
       abi: adAnalyticsAbi,
       functionName: "creditDeveloperEarnings",
-      args: [BigInt(record.chainCampaignId), BigInt(record.chainSlotId), payoutWei, encryptedAmount],
+      args: [BigInt(record.chainCampaignId), BigInt(record.chainSlotId), payoutWei, toSettlementId(record, record.pricingModel === "CPM" ? String(payoutWei) : ""), encryptedAmount],
       chain,
       account,
     });
+    if (record.eventType === "impression" && record.pricingModel === "CPM") {
+      const units = Number(payoutWei / parseEther(record.rate));
+      if (units > 0) {
+        await markSettledImpressionUnits(record.chainCampaignId, record.chainSlotId, units);
+      }
+    }
     await updateMeasurementStatus(record.eventKey, {
       status: "settled",
       settlementTxHash: txHash,

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node scripts/next-dev.mjs",
     "dev:api": "tsx server/index.ts",
+    "worker:settlement": "tsx scripts/settlement-worker.ts",
     "build": "next build",
     "preview": "vite preview",
     "test:contracts": "npx hardhat test",
