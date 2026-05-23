@@ -78,6 +78,7 @@ export async function getNextCampaignId() {
     address: registryAddress,
     abi: adRegistryAbi as any,
     functionName: "nextCampaignId" as any,
+    args: [],
   })) as bigint;
 }
 
@@ -87,6 +88,7 @@ export async function getNextSlotId() {
     address: registryAddress,
     abi: adRegistryAbi as any,
     functionName: "nextSlotId" as any,
+    args: [],
   })) as bigint;
 }
 
@@ -158,6 +160,7 @@ export async function getRegistryChainHealth(): Promise<RegistryChainHealth> {
         address: adRegistryAddress as `0x${string}`,
         abi: adRegistryAbi as any,
         functionName: "nextCampaignId",
+        args: [],
       });
     }
     return { chainId, registryConfigured, chainReadOk: true, blockNumber: blockNumber.toString() };
