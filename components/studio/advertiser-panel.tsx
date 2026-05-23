@@ -7,7 +7,7 @@ import { waitForTransactionReceipt } from "viem/actions";
 import type { Abi, PublicClient } from "viem";
 import { CONTRACTS, CONTRACTS_CONFIGURED, adRegistryAbi } from "@/lib/contracts";
 import { ADNODE_CHAIN_ID } from "@/lib/chain";
-import { getJson, postJson, signedPostMultipart } from "@/lib/adnode-api";
+import { getJson, signedPostJson, signedPostMultipart } from "@/lib/adnode-api";
 import { estimateFeeOverrides } from "@/lib/fees";
 import { clearPendingCampaignSync, loadPendingCampaignSync, savePendingCampaignSync } from "@/lib/pending-campaign-sync";
 import { GlassPanel } from "@/components/ui/glass-panel";
@@ -271,14 +271,14 @@ export function AdvertiserPanel() {
 
       // Auto-save to API immediately (no manual sync step).
       try {
-        await postJson("/api/campaigns-auto", {
+        await signedPostJson("/api/campaigns-auto", "campaigns:auto-sync", {
           chainCampaignId: createdId,
           txHash: hash,
           title,
           description,
           pricingModel,
           rate,
-        });
+        }, signMessageAsync, address);
         clearPendingCampaignSync(createdId);
       } catch (e) {
         savePendingCampaignSync({
@@ -311,6 +311,7 @@ export function AdvertiserPanel() {
     budgetEth,
     cpcUint32,
     initialFundEth,
+    signMessageAsync,
   ]);
 
   useEffect(() => {
@@ -322,20 +323,21 @@ export function AdvertiserPanel() {
       const row = loadPendingCampaignSync().find((p) => p.chainCampaignId === id);
       if (!row) throw new Error("No pending sync found for that id.");
       await overlay.withLoading(async () => {
-        await postJson("/api/campaigns-auto", {
+        if (!address) throw new Error("Connect wallet to sync campaign metadata.");
+        await signedPostJson("/api/campaigns-auto", "campaigns:auto-sync", {
           chainCampaignId: row.chainCampaignId,
           txHash: row.txHash,
           title: row.title ?? "",
           description: row.description ?? "",
           pricingModel: row.pricingModel ?? "CPC",
           rate: row.rate ?? "",
-        });
+        }, signMessageAsync, address);
         clearPendingCampaignSync(id);
         setPending(loadPendingCampaignSync());
         setBusy(`Synced campaign #${id} to API.`);
       });
     },
-    [overlay],
+    [address, overlay, signMessageAsync],
   );
 
   if (!CONTRACTS_CONFIGURED) {

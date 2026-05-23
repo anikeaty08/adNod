@@ -1,12 +1,12 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount, usePublicClient, useReadContract, useWalletClient } from "wagmi";
+import { useAccount, usePublicClient, useReadContract, useWalletClient, useSignMessage } from "wagmi";
 import { waitForTransactionReceipt } from "viem/actions";
 import { decodeEventLog } from "viem";
 import type { Abi } from "viem";
 import { CONTRACTS, CONTRACTS_CONFIGURED, adRegistryAbi } from "@/lib/contracts";
-import { getJson, postJson } from "@/lib/adnode-api";
+import { getJson, postJson, signedPostJson } from "@/lib/adnode-api";
 import { buildEmbedForLanguage, type EmbedLanguage } from "@/lib/embed";
 import { estimateFeeOverrides } from "@/lib/fees";
 import { GlassPanel } from "@/components/ui/glass-panel";
@@ -49,6 +49,7 @@ export function PublisherPanel({
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
+  const { signMessageAsync } = useSignMessage();
 
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [slots, setSlots] = useState<SlotRow[]>([]);
@@ -179,19 +180,19 @@ export function PublisherPanel({
         throw new Error("SlotRegistered event not found in tx logs.");
       }
 
-      // Auto-index to the API (creates a slotKey for embeds; does not require a signature).
-      await postJson("/api/slots-auto", {
+      // Auto-index to the API with owner signature so public callers cannot front-run slot metadata.
+      await signedPostJson("/api/slots-auto", "slots:auto-sync", {
         chainSlotId,
         txHash,
         siteUrl,
         dailyTrafficEstimate: traffic,
-      });
+      }, signMessageAsync, address);
 
       await loadLists();
       const created = slots.find((s) => s.chainSlotId === chainSlotId) ?? { chainSlotId, siteName, category };
       setSelectedSlot(created);
     });
-  }, [address, publicClient, walletClient, overlay, siteName, category, siteUrl, traffic, loadLists, slots]);
+  }, [address, publicClient, walletClient, overlay, siteName, category, siteUrl, traffic, loadLists, slots, signMessageAsync]);
 
   const assign = useCallback(async () => {
     if (!address || !publicClient || !walletClient || !selectedSlot || !assignCampaignId) return;

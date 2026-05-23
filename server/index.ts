@@ -7,10 +7,10 @@ import { buildEmbedFrameHtml, buildEmbedScript, createEmbedFramePayload, getPubl
 import { assignSlotCampaign, createSlot, getSlotByKey, getSlots, sanitizeSlotMetadata } from "./slot-store.js";
 import { assertSignedRequest } from "./request-auth.js";
 import { getAssignedCampaignId, getCampaignHoster, getRegistryChainHealth, getSlotDeveloper } from "./chain-state.js";
-import { buildMeasurementEventKey, buildMeasurementFingerprint, consumeMeasurementNonce, hashPageUrl, verifyMeasurementToken } from "./measurement.js";
+import { assertBoundMeasurementToken, buildMeasurementEventKey, buildMeasurementFingerprint, consumeMeasurementNonce, hashPageUrl, verifyMeasurementToken } from "./measurement.js";
 import { recordMeasurement } from "./measurement-store.js";
 import { replayPendingMeasurements } from "./settlement-service.js";
-import { assertRuntimeSafety } from "./runtime.js";
+import { assertRuntimeSafety, strictModeEnabled } from "./runtime.js";
 import { startSettlementReplayWorker } from "./settlement-worker.js";
 import { backfillSlotsFromChain } from "./slot-chain-sync.js";
 import { evaluateMeasurementPolicy } from "./measurement-policy.js";
@@ -249,6 +249,7 @@ app.post("/api/measure", rateLimit(120, "measure"), async (req, res) => {
   let verifiedToken;
   try {
     verifiedToken = verifyMeasurementToken(token);
+    if (strictModeEnabled()) assertBoundMeasurementToken(verifiedToken);
   } catch (error) {
     res.status(401).json({ error: error instanceof Error ? error.message : "Invalid measurement token." });
     return;

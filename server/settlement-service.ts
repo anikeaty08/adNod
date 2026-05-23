@@ -12,10 +12,17 @@ import { listPendingMeasurements } from "./measurement-store.js";
 import { incrementAcceptedImpression, markSettledImpressionUnits } from "./settlement-state-store.js";
 import { updateMeasurementStatus, type MeasurementRecord } from "./measurement-store.js";
 import { arbitrumSepolia } from "viem/chains";
-import { FHELIUM_CHAIN_ID, getConfiguredChainId } from "./runtime.js";
+import { FHELIUM_CHAIN_ID, getConfiguredChainId, strictModeEnabled } from "./runtime.js";
 import { incrementMetric, logError } from "./observability.js";
 
-const settlementPrivateKey = process.env.SETTLEMENT_PRIVATE_KEY || process.env.PRIVATE_KEY;
+function getSettlementPrivateKey() {
+  const dedicatedKey = process.env.SETTLEMENT_PRIVATE_KEY;
+  if (dedicatedKey) return dedicatedKey;
+  if (strictModeEnabled()) {
+    throw new Error("SETTLEMENT_PRIVATE_KEY is required for production settlement writes.");
+  }
+  return process.env.PRIVATE_KEY;
+}
 const chainId = getConfiguredChainId();
 const rpcUrl =
   process.env.VITE_FHENIX_RPC_URL ||
@@ -45,7 +52,7 @@ const chain =
 let cofheClientPromise: ReturnType<typeof createCofheClient> | null = null;
 
 function assertSettlementReady() {
-  if (!settlementPrivateKey) {
+  if (!getSettlementPrivateKey()) {
     throw new Error("SETTLEMENT_PRIVATE_KEY or PRIVATE_KEY is required for settlement writes.");
   }
   if (!adAnalyticsAddress) {
@@ -55,7 +62,8 @@ function assertSettlementReady() {
 
 function getClients() {
   assertSettlementReady();
-  const account = privateKeyToAccount((settlementPrivateKey!.startsWith("0x") ? settlementPrivateKey : `0x${settlementPrivateKey}`) as `0x${string}`);
+  const settlementPrivateKey = getSettlementPrivateKey()!;
+  const account = privateKeyToAccount((settlementPrivateKey.startsWith("0x") ? settlementPrivateKey : `0x${settlementPrivateKey}`) as `0x${string}`);
   const publicClient = createPublicClient({
     chain,
     transport: http(rpcUrl),

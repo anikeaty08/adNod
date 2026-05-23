@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { evaluateMeasurementPolicy } from "../../server/measurement-policy.js";
-import { buildMeasurementEventKey } from "../../server/measurement.js";
+import { assertBoundMeasurementToken, buildMeasurementEventKey } from "../../server/measurement.js";
 
 test("clean browser measurement is billable", () => {
   const result = evaluateMeasurementPolicy({
@@ -48,4 +48,22 @@ test("measurement event key uses nonce when present", () => {
   });
 
   assert.equal(keyA, keyB);
+});
+
+test("bound measurement token requires publisher and page context", () => {
+  assert.throws(
+    () =>
+      assertBoundMeasurementToken({
+        chainCampaignId: "1",
+        chainSlotId: "2",
+        slotKey: "",
+        publisherOrigin: "",
+        pageUrlHash: "",
+        sessionId: "session",
+        nonce: "nonce",
+        issuedAt: Date.now(),
+        expiresAt: Date.now() + 60_000,
+      }),
+    /binding fields/i,
+  );
 });

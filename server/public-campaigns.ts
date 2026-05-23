@@ -3,6 +3,7 @@ import { getCampaigns } from "./campaign-store.js";
 import { getSlots } from "./slot-store.js";
 import { adRegistryAddress, serverPublicClient as publicClient } from "./chain-state.js";
 import { createMeasurementNonce, createMeasurementToken, hashPageUrl } from "./measurement.js";
+import { strictModeEnabled } from "./runtime.js";
 
 function getIpfsGatewayUrl(uri: string) {
   if (uri.startsWith("ipfs://")) {
@@ -375,6 +376,9 @@ export function createEmbedFramePayload(
   context: { slotKey?: string; publisherOrigin?: string; pageUrl?: string; sessionId?: string } = {},
 ) {
   const pageUrl = context.pageUrl || "";
+  if (strictModeEnabled() && (!context.slotKey || !context.publisherOrigin || !pageUrl || !context.sessionId)) {
+    throw new Error("Secure embed context requires slotKey, publisherOrigin, pageUrl, and sessionId.");
+  }
   return {
     campaign,
     measurementToken: createMeasurementToken({

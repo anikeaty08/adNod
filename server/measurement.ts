@@ -5,7 +5,7 @@ import { strictModeEnabled } from "./runtime.js";
 
 const TOKEN_TTL_MS = 10 * 60 * 1000;
 
-interface MeasurementTokenPayload {
+export interface MeasurementTokenPayload {
   chainCampaignId: string;
   chainSlotId: string;
   slotKey: string;
@@ -55,6 +55,12 @@ export function verifyMeasurementToken(token: string) {
   }
 
   return payload;
+}
+
+export function assertBoundMeasurementToken(payload: MeasurementTokenPayload) {
+  if (!payload.slotKey || !payload.publisherOrigin || !payload.pageUrlHash || !payload.sessionId || !payload.nonce) {
+    throw new Error("Measurement token is missing required binding fields.");
+  }
 }
 
 const memoryNonceUsage = new Set<string>();

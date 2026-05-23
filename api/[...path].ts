@@ -9,7 +9,7 @@ import { readJsonBody } from "../server/http-body.js";
 import { parseMultipartUpload, uploadBufferToPinata } from "../server/pinata.js";
 import { getAssistantReply, type AssistantMessage } from "../server/assistant.js";
 import { getPublicCampaignById, getPublicCampaignBySlotId, createEmbedFramePayload, buildEmbedFrameHtml, buildEmbedScript } from "../server/public-campaigns.js";
-import { verifyMeasurementToken, buildMeasurementFingerprint, buildMeasurementEventKey, consumeMeasurementNonce, hashPageUrl } from "../server/measurement.js";
+import { assertBoundMeasurementToken, verifyMeasurementToken, buildMeasurementFingerprint, buildMeasurementEventKey, consumeMeasurementNonce, hashPageUrl } from "../server/measurement.js";
 import { recordMeasurement } from "../server/measurement-store.js";
 import { replayPendingMeasurements } from "../server/settlement-service.js";
 import { backfillSlotsFromChain } from "../server/slot-chain-sync.js";
@@ -19,6 +19,7 @@ import { assertRole } from "../server/roles.js";
 import { assertCreativeUploadQuota } from "../server/upload-quota.js";
 import { listAccessRequests } from "../server/admin-service.js";
 import { getMetricsSnapshot, incrementMetric } from "../server/observability.js";
+import { strictModeEnabled } from "../server/runtime.js";
 import { decodeEventLog, formatEther, parseEther } from "viem";
 import adRegistryAbi from "../lib/abi/registry-abi.json" with { type: "json" };
 
@@ -237,6 +238,13 @@ async function handleCampaignAutoSync(req: IncomingMessage, res: ServerResponse)
   if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) return sendJson(res, 400, { error: "txHash is required." });
   if (!adRegistryAddress) return sendJson(res, 500, { error: "AdRegistry is not configured on the server." });
 
+  let signerAddress = "";
+  try {
+    signerAddress = await assertSignedRequest(req.headers, "campaigns:auto-sync", body);
+  } catch (error) {
+    return sendJson(res, 401, { error: error instanceof Error ? error.message : "Unauthorized request." });
+  }
+
   // Unsigned endpoint: create-once only. Prevent public overwrites.
   const existing = await getCampaignByChainId(chainCampaignId);
   if (existing) return sendJson(res, 200, existing);
@@ -279,6 +287,9 @@ async function handleCampaignAutoSync(req: IncomingMessage, res: ServerResponse)
     }
 
     const advertiser = created.hoster.toLowerCase();
+    if (advertiser !== signerAddress) {
+      throw new Error("Signed wallet does not own this on-chain campaign.");
+    }
 
     const [model, rateWei] = await getCampaignSettlementTerms(chainCampaignId);
     const pricingModel = model === 2 ? "CPM" : "CPC";
@@ -391,6 +402,13 @@ async function handleSlotAutoSync(req: IncomingMessage, res: ServerResponse) {
   if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) return sendJson(res, 400, { error: "txHash is required." });
   if (!adRegistryAddress) return sendJson(res, 500, { error: "AdRegistry is not configured on the server." });
 
+  let signerAddress = "";
+  try {
+    signerAddress = await assertSignedRequest(req.headers, "slots:auto-sync", body);
+  } catch (error) {
+    return sendJson(res, 401, { error: error instanceof Error ? error.message : "Unauthorized request." });
+  }
+
   const existing = await getSlotByChainId(chainSlotId);
   if (existing) return sendJson(res, 200, existing);
 
@@ -425,6 +443,9 @@ async function handleSlotAutoSync(req: IncomingMessage, res: ServerResponse) {
     }
 
     if (!created) throw new Error("SlotRegistered event not found in receipt logs.");
+    if (created.developer.toLowerCase() !== signerAddress) {
+      throw new Error("Signed wallet does not own this on-chain slot.");
+    }
 
     const url = getUrl(req);
     const origin = `${url.protocol}//${url.host}`;
@@ -582,6 +603,7 @@ async function handleMeasure(req: IncomingMessage, res: ServerResponse) {
   let verifiedToken: ReturnType<typeof verifyMeasurementToken>;
   try {
     verifiedToken = verifyMeasurementToken(token);
+    if (strictModeEnabled()) assertBoundMeasurementToken(verifiedToken);
   } catch (error) {
     return sendJson(res, 401, { error: error instanceof Error ? error.message : "Invalid measurement token." });
   }
