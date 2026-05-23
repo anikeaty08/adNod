@@ -13,6 +13,12 @@ import { verifyMeasurementToken, buildMeasurementFingerprint, buildMeasurementEv
 import { recordMeasurement } from "../server/measurement-store.js";
 import { replayPendingMeasurements } from "../server/settlement-service.js";
 import { backfillSlotsFromChain } from "../server/slot-chain-sync.js";
+import { evaluateMeasurementPolicy } from "../server/measurement-policy.js";
+import { measurementQuotaExceeded } from "../server/measurement-quota.js";
+import { assertRole } from "../server/roles.js";
+import { assertCreativeUploadQuota } from "../server/upload-quota.js";
+import { listAccessRequests } from "../server/admin-service.js";
+import { getMetricsSnapshot, incrementMetric } from "../server/observability.js";
 import { decodeEventLog, formatEther, parseEther } from "viem";
 import adRegistryAbi from "../lib/abi/registry-abi.json" with { type: "json" };
 
@@ -51,6 +57,7 @@ async function handleAssistant(req: IncomingMessage, res: ServerResponse) {
 
   try {
     await assertSignedRequest(req.headers, "assistant:ask", { prompt, history });
+    incrementMetric("assistant_usage");
     const completion = await getAssistantReply(prompt, history);
     return sendJson(res, 200, completion);
   } catch (error) {
@@ -519,6 +526,7 @@ async function handleEmbed(req: IncomingMessage, res: ServerResponse) {
   if (mode === "frame") {
     try {
       const campaign = await getPublicCampaignBySlotId(slotId as number);
+      incrementMetric("embed_render");
       const origin = `${url.protocol}//${url.host}`;
       const payload = createEmbedFramePayload(campaign, origin, {
         slotKey: rawSlotKey || "",
@@ -596,13 +604,35 @@ async function handleMeasure(req: IncomingMessage, res: ServerResponse) {
   }
 
   try {
+    incrementMetric("assistant_usage");
     await consumeMeasurementNonce(verifiedToken, eventType as "impression" | "click");
   } catch (error) {
+    incrementMetric("measurement_duplicate");
     return sendJson(res, 202, { ok: true, duplicate: true, error: error instanceof Error ? error.message : "Duplicate measurement." });
   }
 
   const remoteAddress = String(req.socket?.remoteAddress ?? "");
   const userAgent = Array.isArray(req.headers["user-agent"]) ? req.headers["user-agent"][0] ?? "" : String(req.headers["user-agent"] ?? "");
+  const policy = evaluateMeasurementPolicy({
+    eventType: eventType as "impression" | "click",
+    pageUrl,
+    referrer,
+    publisherOrigin,
+    userAgent,
+    remoteAddress,
+  });
+  if (
+    await measurementQuotaExceeded({
+      chainCampaignId: campaign.id,
+      chainSlotId: campaign.slotId,
+      eventType: eventType as "impression" | "click",
+    })
+  ) {
+    policy.billable = false;
+    policy.fraudStatus = "review";
+    policy.fraudScore = Math.max(policy.fraudScore, 70);
+    policy.fraudReasons = [...policy.fraudReasons, "quota_exceeded"];
+  }
   const fingerprint = buildMeasurementFingerprint({
     remoteAddress,
     userAgent,
@@ -633,9 +663,20 @@ async function handleMeasure(req: IncomingMessage, res: ServerResponse) {
     nonce: verifiedToken.nonce,
     publisherOrigin,
     pageUrlHash: verifiedToken.pageUrlHash,
+    billable: policy.billable,
+    fraudStatus: policy.fraudStatus,
+    fraudScore: policy.fraudScore,
+    fraudReasons: policy.fraudReasons,
+    reviewHash: policy.reviewHash,
   });
 
-  if (duplicate) return sendJson(res, 202, { ok: true, duplicate: true });
+  if (duplicate) {
+    incrementMetric("measurement_duplicate");
+    return sendJson(res, 202, { ok: true, duplicate: true });
+  }
+  if (record.status === "review") incrementMetric("measurement_review");
+  else if (record.status === "rejected") incrementMetric("measurement_reject");
+  else incrementMetric("measurement_accept");
   return sendJson(res, 202, { ok: true, duplicate: false, status: record.status });
 }
 
@@ -661,14 +702,17 @@ async function handleUploadCreative(req: IncomingMessage, res: ServerResponse) {
       size: Number(req.headers["x-adnode-upload-size"] ?? 0),
       type: String(req.headers["x-adnode-upload-type"] ?? "application/octet-stream"),
     };
-    await assertSignedRequest(req.headers, "uploads:creative", signedMeta);
+    const signer = await assertSignedRequest(req.headers, "uploads:creative", signedMeta);
+    await assertCreativeUploadQuota(signer, signedMeta.size, signedMeta.type);
     const file = await parseMultipartUpload(req);
     if (file.filename !== signedMeta.filename || file.buffer.byteLength !== signedMeta.size || file.mimeType !== signedMeta.type) {
       throw new Error("Upload metadata does not match authorization payload.");
     }
     const uri = await uploadBufferToPinata(file);
+    incrementMetric("upload_success");
     return sendJson(res, 201, { uri });
   } catch (error) {
+    incrementMetric("upload_failure");
     const message = error instanceof Error ? error.message : "Creative upload failed.";
     const code = message.toLowerCase().includes("authorization") || message.toLowerCase().includes("signature") || message.toLowerCase().includes("expired") ? 401 : 400;
     return sendJson(res, code, { error: message });
@@ -686,7 +730,8 @@ async function handleSettlementReplay(req: IncomingMessage, res: ServerResponse)
   }
 
   try {
-    await assertSignedRequest(req.headers, "settlement:replay", payload);
+    const signer = await assertSignedRequest(req.headers, "settlement:replay", payload);
+    assertRole(signer, "settlement");
   } catch (error) {
     return sendJson(res, 401, { error: error instanceof Error ? error.message : "Unauthorized request." });
   }
@@ -720,6 +765,45 @@ async function handleSettlementWorker(req: IncomingMessage, res: ServerResponse)
   }
 }
 
+async function handleAdminAccessRequests(req: IncomingMessage, res: ServerResponse) {
+  if (req.method !== "POST") return methodNotAllowed(res, "POST");
+
+  let payload: Record<string, unknown>;
+  try {
+    payload = await readJsonBody(req);
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : "Invalid request body." });
+  }
+
+  try {
+    const signer = await assertSignedRequest(req.headers, "admin:access:list", payload);
+    assertRole(signer, "admin");
+    const rows = await listAccessRequests();
+    return sendJson(res, 200, { rows });
+  } catch (error) {
+    return sendJson(res, 401, { error: error instanceof Error ? error.message : "Unauthorized admin request." });
+  }
+}
+
+async function handleOpsMetrics(req: IncomingMessage, res: ServerResponse) {
+  if (req.method !== "POST") return methodNotAllowed(res, "POST");
+
+  let payload: Record<string, unknown>;
+  try {
+    payload = await readJsonBody(req);
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : "Invalid request body." });
+  }
+
+  try {
+    const signer = await assertSignedRequest(req.headers, "ops:metrics", payload);
+    assertRole(signer, "admin");
+    return sendJson(res, 200, { ok: true, metrics: getMetricsSnapshot() });
+  } catch (error) {
+    return sendJson(res, 401, { error: error instanceof Error ? error.message : "Unauthorized metrics request." });
+  }
+}
+
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   const pathname = getPathname(req);
 
@@ -740,6 +824,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if (p === "/upload-creative") return await handleUploadCreative(req, res);
     if (p === "/settlement-replay") return await handleSettlementReplay(req, res);
     if (p === "/settlement-worker") return await handleSettlementWorker(req, res);
+    if (p === "/admin/access-requests") return await handleAdminAccessRequests(req, res);
+    if (p === "/ops/metrics") return await handleOpsMetrics(req, res);
     if (p === "/assistant-chat") return await handleAssistantChat(req, res);
     if (p === "/assistant") return await handleAssistant(req, res);
 

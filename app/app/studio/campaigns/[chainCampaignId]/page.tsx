@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useAccount, useReadContracts } from "wagmi";
-import { formatEther, type Abi } from "viem";
+import { useAccount, usePublicClient, useReadContracts, useWalletClient } from "wagmi";
+import { formatEther, parseEther, type Abi } from "viem";
+import { waitForTransactionReceipt } from "viem/actions";
 import {
   Area,
   AreaChart,
@@ -21,9 +22,12 @@ import {
   YAxis,
 } from "recharts";
 import { getJson } from "@/lib/adnode-api";
+import { estimateFeeOverrides } from "@/lib/fees";
 import { useHydrated } from "@/lib/use-hydrated";
 import { displayCampaignTitle } from "@/lib/campaign-title";
 import { GlassPanel } from "@/components/ui/glass-panel";
+import { PrimaryButton } from "@/components/ui/primary-button";
+import { Field, TextInput } from "@/components/ui/field";
 import { CONTRACTS, CONTRACTS_CONFIGURED, adRegistryAbi } from "@/lib/contracts";
 
 type CampaignRow = Record<string, unknown>;
@@ -44,11 +48,16 @@ export default function StudioCampaignDetailPage() {
   const idNum = Number(idPart);
   const idOk = Number.isFinite(idNum) && idNum >= 1;
   const { address } = useAccount();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
   const hydrated = useHydrated();
 
   const [row, setRow] = useState<CampaignRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [topUpEth, setTopUpEth] = useState("");
+  const [withdrawEth, setWithdrawEth] = useState("");
+  const [actionBusy, setActionBusy] = useState("");
 
   useEffect(() => {
     if (!rawId) {
@@ -110,6 +119,22 @@ export default function StudioCampaignDetailPage() {
   const terms = onchain?.[3]?.result as readonly [number, bigint] | undefined;
 
   const isHoster = Boolean(address && hoster && address.toLowerCase() === hoster.toLowerCase());
+
+  async function runHosterWrite(fn: () => Promise<`0x${string}`>) {
+    if (!publicClient || !walletClient || !isHoster) {
+      setActionBusy("Connect the campaign hoster wallet.");
+      return;
+    }
+    setActionBusy("");
+    try {
+      const hash = await fn();
+      await waitForTransactionReceipt(publicClient, { hash });
+      setActionBusy("Confirmed. Refreshing chain state...");
+      window.location.reload();
+    } catch (error) {
+      setActionBusy(error instanceof Error ? error.message : "Transaction failed.");
+    }
+  }
 
   const fundingBar = useMemo(() => {
     if (!funding) return [];
@@ -279,6 +304,76 @@ export default function StudioCampaignDetailPage() {
           )}
         </GlassPanel>
       </div>
+
+      {isHoster && publicClient && walletClient ? (
+        <GlassPanel className="space-y-4 p-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Advertiser controls</p>
+            <p className="mt-1 text-sm text-muted">Top up, pause or resume, and withdraw unspent funds after pausing.</p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+            <Field label="Top-up ETH">
+              <TextInput value={topUpEth} onChange={(e) => setTopUpEth(e.target.value)} placeholder="0.05" />
+            </Field>
+            <Field label="Withdraw ETH">
+              <TextInput value={withdrawEth} onChange={(e) => setWithdrawEth(e.target.value)} placeholder="0.01" />
+            </Field>
+            <div className="flex flex-wrap items-end gap-2">
+              <PrimaryButton
+                disabled={!topUpEth}
+                onClick={() =>
+                  void runHosterWrite(async () =>
+                    walletClient.writeContract({
+                      address: CONTRACTS.registry,
+                      abi: registryAbi,
+                      functionName: "fundCampaign",
+                      args: [BigInt(idNum)],
+                      value: parseEther(topUpEth),
+                      ...(await estimateFeeOverrides(publicClient)),
+                    }),
+                  )
+                }
+              >
+                Top up
+              </PrimaryButton>
+              <PrimaryButton
+                variant="secondary"
+                onClick={() =>
+                  void runHosterWrite(async () =>
+                    walletClient.writeContract({
+                      address: CONTRACTS.registry,
+                      abi: registryAbi,
+                      functionName: "setCampaignActive",
+                      args: [BigInt(idNum), !chainActive],
+                      ...(await estimateFeeOverrides(publicClient)),
+                    }),
+                  )
+                }
+              >
+                {chainActive ? "Pause" : "Resume"}
+              </PrimaryButton>
+              <PrimaryButton
+                variant="ghost"
+                disabled={!withdrawEth || chainActive !== false}
+                onClick={() =>
+                  void runHosterWrite(async () =>
+                    walletClient.writeContract({
+                      address: CONTRACTS.registry,
+                      abi: registryAbi,
+                      functionName: "withdrawUnspentCampaignFunds",
+                      args: [BigInt(idNum), parseEther(withdrawEth)],
+                      ...(await estimateFeeOverrides(publicClient)),
+                    }),
+                  )
+                }
+              >
+                Withdraw
+              </PrimaryButton>
+            </div>
+          </div>
+          {actionBusy ? <p className="text-sm text-muted">{actionBusy}</p> : null}
+        </GlassPanel>
+      ) : null}
 
       {CONTRACTS_CONFIGURED && funding && (
         <div className="grid gap-6 lg:grid-cols-2">

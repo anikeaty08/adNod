@@ -27,6 +27,7 @@ type SlotRow = {
   slotKey?: string;
   siteName: string;
   category: string;
+  developer?: string;
   assignedCampaignId?: string;
 };
 
@@ -82,15 +83,17 @@ export function PublisherPanel({
           slotKey: typeof r.slotKey === "string" ? r.slotKey : undefined,
           siteName: String(r.siteName ?? ""),
           category: String(r.category ?? ""),
+          developer: String(r.developer ?? ""),
           assignedCampaignId: String(r.assignedCampaignId ?? ""),
         } satisfies SlotRow;
       });
-      setSlots(normalized.filter((x) => x.chainSlotId));
+      const owner = String(address ?? "").toLowerCase();
+      setSlots(normalized.filter((x) => x.chainSlotId && (!owner || String(x.developer ?? "").toLowerCase() === owner)));
     } catch {
       setCampaigns([]);
       setSlots([]);
     }
-  }, []);
+  }, [address]);
 
   useEffect(() => {
     void loadLists();

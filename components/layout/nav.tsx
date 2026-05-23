@@ -5,7 +5,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { usePathname } from "next/navigation";
 import { useChainId } from "wagmi";
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, Clapperboard, Home, LayoutGrid, LayoutTemplate, PlusCircle, Wallet } from "lucide-react";
+import { BookOpen, Clapperboard, Home, LayoutGrid, LayoutTemplate, PlusCircle, ShieldCheck, Wallet } from "lucide-react";
 import { ADNODE_CHAIN_ID, adnodeChain } from "@/lib/chain";
 import { ThemeSwitcher } from "./theme-switcher";
 import { AdNodeLogo } from "@/components/brand/adnode-logo";
@@ -16,6 +16,7 @@ const studioLinks: readonly { href: string; label: string; icon: LucideIcon }[] 
   { href: "/app/studio", label: "Studio", icon: Clapperboard },
   { href: "/app/studio/create", label: "New campaign", icon: PlusCircle },
   { href: "/app/studio/campaigns", label: "Your campaigns", icon: LayoutGrid },
+  { href: "/app/studio/admin", label: "Admin", icon: ShieldCheck },
 ] as const;
 
 const publisherStudioLinks: readonly { href: string; label: string; icon: LucideIcon }[] = [

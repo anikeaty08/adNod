@@ -13,6 +13,7 @@ import { incrementAcceptedImpression, markSettledImpressionUnits } from "./settl
 import { updateMeasurementStatus, type MeasurementRecord } from "./measurement-store.js";
 import { arbitrumSepolia } from "viem/chains";
 import { FHELIUM_CHAIN_ID, getConfiguredChainId } from "./runtime.js";
+import { incrementMetric, logError } from "./observability.js";
 
 const settlementPrivateKey = process.env.SETTLEMENT_PRIVATE_KEY || process.env.PRIVATE_KEY;
 const chainId = getConfiguredChainId();
@@ -170,40 +171,68 @@ export async function syncMeasurementToChain(record: MeasurementRecord) {
   const { account, publicClient, walletClient } = getClients();
 
   const analyticsAddress = adAnalyticsAddress!;
-  let payoutWei = 0n;
+  let payoutWei = record.pendingPayoutWei ? BigInt(record.pendingPayoutWei) : 0n;
+  let pendingImpressionUnits = Number(record.pendingImpressionUnits ?? 0);
   const eventId = toSettlementId(record, "event");
 
   if (record.eventType === "impression") {
-    await writeContract(walletClient, {
-      address: analyticsAddress,
-      abi: adAnalyticsAbi,
-      functionName: "recordImpression",
-      args: [BigInt(record.chainCampaignId), eventId],
-      chain,
-      account,
-    });
+    if (!record.countedAt) {
+      const counterTxHash = await writeContract(walletClient, {
+        address: analyticsAddress,
+        abi: adAnalyticsAbi,
+        functionName: "recordImpression",
+        args: [BigInt(record.chainCampaignId), eventId],
+        chain,
+        account,
+      });
+      await updateMeasurementStatus(record.eventKey, {
+        status: "pending_chain",
+        counterTxHash,
+        countedAt: new Date(),
+        lastError: "",
+      });
+      record = { ...record, status: "pending_chain", counterTxHash, countedAt: new Date() };
+    }
 
-    if (record.pricingModel === "CPM") {
+    if (record.pricingModel === "CPM" && !record.meteredAt) {
       const state = await incrementAcceptedImpression(record.chainCampaignId, record.chainSlotId);
       const newlyBillableUnits = Math.floor(state.acceptedImpressions / 1000) - state.settledImpressionUnits;
       if (newlyBillableUnits > 0) {
         payoutWei = computePayoutWei(record.rate, BigInt(newlyBillableUnits));
+        pendingImpressionUnits = newlyBillableUnits;
       }
+      await updateMeasurementStatus(record.eventKey, {
+        status: "pending_chain",
+        meteredAt: new Date(),
+        pendingPayoutWei: payoutWei.toString(),
+        pendingImpressionUnits,
+      });
+      record = { ...record, meteredAt: new Date(), pendingPayoutWei: payoutWei.toString(), pendingImpressionUnits };
     }
   }
 
   if (record.eventType === "click") {
-    await writeContract(walletClient, {
-      address: analyticsAddress,
-      abi: adAnalyticsAbi,
-      functionName: "recordClick",
-      args: [BigInt(record.chainCampaignId), eventId],
-      chain,
-      account,
-    });
+    if (!record.countedAt) {
+      const counterTxHash = await writeContract(walletClient, {
+        address: analyticsAddress,
+        abi: adAnalyticsAbi,
+        functionName: "recordClick",
+        args: [BigInt(record.chainCampaignId), eventId],
+        chain,
+        account,
+      });
+      await updateMeasurementStatus(record.eventKey, {
+        status: "pending_chain",
+        counterTxHash,
+        countedAt: new Date(),
+        lastError: "",
+      });
+      record = { ...record, status: "pending_chain", counterTxHash, countedAt: new Date() };
+    }
 
     if (record.pricingModel === "CPC") {
       payoutWei = computePayoutWei(record.rate, 1n);
+      record = { ...record, pendingPayoutWei: payoutWei.toString() };
     }
   }
 
@@ -219,9 +248,8 @@ export async function syncMeasurementToChain(record: MeasurementRecord) {
       account,
     });
     if (record.eventType === "impression" && record.pricingModel === "CPM") {
-      const units = Number(payoutWei / parseEther(record.rate));
-      if (units > 0) {
-        await markSettledImpressionUnits(record.chainCampaignId, record.chainSlotId, units);
+      if (pendingImpressionUnits > 0) {
+        await markSettledImpressionUnits(record.chainCampaignId, record.chainSlotId, pendingImpressionUnits);
       }
     }
     await updateMeasurementStatus(record.eventKey, {
@@ -229,7 +257,10 @@ export async function syncMeasurementToChain(record: MeasurementRecord) {
       settlementTxHash: txHash,
       lastError: "",
       settledAt: new Date(),
+      pendingPayoutWei: "0",
+      pendingImpressionUnits: 0,
     });
+    incrementMetric("settlement_success");
     return { status: "settled" as const, txHash, payoutEth: formatEther(payoutWei) };
   }
 
@@ -239,10 +270,16 @@ export async function syncMeasurementToChain(record: MeasurementRecord) {
     lastError: "",
     settledAt: new Date(),
   });
+  incrementMetric("settlement_success");
   return { status: "recorded" as const, txHash: "", payoutEth: "0" };
 }
 
 export async function markMeasurementPending(record: MeasurementRecord, error: unknown) {
+  incrementMetric("settlement_failure");
+  logError("settlement_pending", {
+    eventKey: record.eventKey,
+    error: error instanceof Error ? error.message : "Chain sync failed.",
+  });
   await updateMeasurementStatus(record.eventKey, {
     status: "pending_chain",
     lastError: error instanceof Error ? error.message : "Chain sync failed.",

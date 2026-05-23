@@ -13,6 +13,13 @@ import { replayPendingMeasurements } from "./settlement-service.js";
 import { assertRuntimeSafety } from "./runtime.js";
 import { startSettlementReplayWorker } from "./settlement-worker.js";
 import { backfillSlotsFromChain } from "./slot-chain-sync.js";
+import { evaluateMeasurementPolicy } from "./measurement-policy.js";
+import { measurementQuotaExceeded } from "./measurement-quota.js";
+import { assertRole } from "./roles.js";
+import { assertCreativeUploadQuota } from "./upload-quota.js";
+import { listAccessRequests } from "./admin-service.js";
+import { getMetricsSnapshot, incrementMetric, logError, logInfo, requestId } from "./observability.js";
+import { ensureDatabaseIndexes } from "./database-indexes.js";
 
 const app = express();
 const localhostOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
@@ -47,6 +54,19 @@ function rateLimit(maxRequests: number, label: string) {
 }
 
 app.use((req, res, next) => {
+  const id = requestId();
+  res.header("X-Request-Id", id);
+  const started = Date.now();
+  res.on("finish", () => {
+    logInfo("http_request", {
+      requestId: id,
+      method: req.method,
+      path: req.path,
+      statusCode: res.statusCode,
+      durationMs: Date.now() - started,
+    });
+  });
+
   const origin = req.headers.origin;
 
   if (origin && corsAllowsOrigin(origin)) {
@@ -98,6 +118,16 @@ app.get("/api/slots", async (_req, res) => {
     // Keep the endpoint usable when RPC is unavailable; DB rows still return.
   }
   res.json(slots);
+});
+
+app.post("/api/ops/metrics", async (req, res) => {
+  try {
+    const signer = await assertSignedRequest(req.headers, "ops:metrics", (req.body as Record<string, unknown>) ?? {});
+    assertRole(signer, "admin");
+    res.json({ ok: true, metrics: getMetricsSnapshot() });
+  } catch (error) {
+    res.status(401).json({ error: error instanceof Error ? error.message : "Unauthorized metrics request." });
+  }
 });
 
 app.get("/api/public-campaign", async (req, res) => {
@@ -155,6 +185,7 @@ app.get("/api/embed", async (req, res) => {
   if (mode === "frame") {
     try {
       const campaign = await getPublicCampaignBySlotId(slotId);
+      incrementMetric("embed_render");
       const origin = `${req.protocol}://${req.get("host")}`;
       const context = embedContextFromRequest(req, slotKey);
       const payload = createEmbedFramePayload(campaign, origin, context);
@@ -247,12 +278,33 @@ app.post("/api/measure", rateLimit(120, "measure"), async (req, res) => {
   try {
     await consumeMeasurementNonce(verifiedToken, eventType as "impression" | "click");
   } catch (error) {
+    incrementMetric("measurement_duplicate");
     res.status(202).json({ ok: true, duplicate: true, error: error instanceof Error ? error.message : "Duplicate measurement." });
     return;
   }
 
   const userAgent = String(req.headers["user-agent"] ?? "");
   const remoteAddress = String(req.socket.remoteAddress ?? "");
+  const policy = evaluateMeasurementPolicy({
+    eventType: eventType as "impression" | "click",
+    pageUrl,
+    referrer,
+    publisherOrigin,
+    userAgent,
+    remoteAddress,
+  });
+  if (
+    await measurementQuotaExceeded({
+      chainCampaignId: campaign.id,
+      chainSlotId: campaign.slotId,
+      eventType: eventType as "impression" | "click",
+    })
+  ) {
+    policy.billable = false;
+    policy.fraudStatus = "review";
+    policy.fraudScore = Math.max(policy.fraudScore, 70);
+    policy.fraudReasons = [...policy.fraudReasons, "quota_exceeded"];
+  }
   const fingerprint = buildMeasurementFingerprint({
     remoteAddress,
     userAgent,
@@ -283,20 +335,30 @@ app.post("/api/measure", rateLimit(120, "measure"), async (req, res) => {
     nonce: verifiedToken.nonce,
     publisherOrigin,
     pageUrlHash: verifiedToken.pageUrlHash,
+    billable: policy.billable,
+    fraudStatus: policy.fraudStatus,
+    fraudScore: policy.fraudScore,
+    fraudReasons: policy.fraudReasons,
+    reviewHash: policy.reviewHash,
   });
 
   if (duplicate) {
+    incrementMetric("measurement_duplicate");
     res.status(202).json({ ok: true, duplicate: true });
     return;
   }
 
+  if (record.status === "review") incrementMetric("measurement_review");
+  else if (record.status === "rejected") incrementMetric("measurement_reject");
+  else incrementMetric("measurement_accept");
   res.status(202).json({ ok: true, duplicate: false, status: record.status });
 });
 
 app.post("/api/settlement/replay", rateLimit(15, "replay"), async (req, res) => {
   try {
     const payload = ((req.body as Record<string, unknown> | undefined) ?? {});
-    await assertSignedRequest(req.headers, "settlement:replay", payload);
+    const signer = await assertSignedRequest(req.headers, "settlement:replay", payload);
+    assertRole(signer, "settlement");
   } catch (error) {
     res.status(401).json({ error: error instanceof Error ? error.message : "Unauthorized request." });
     return;
@@ -307,6 +369,19 @@ app.post("/api/settlement/replay", rateLimit(15, "replay"), async (req, res) => 
     res.json({ ok: true, ...summary });
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Settlement replay failed." });
+  }
+});
+
+app.post("/api/admin/access-requests", rateLimit(30, "admin-access"), async (req, res) => {
+  const payload = ((req.body as Record<string, unknown> | undefined) ?? {});
+  try {
+    const signer = await assertSignedRequest(req.headers, "admin:access:list", payload);
+    assertRole(signer, "admin");
+    const rows = await listAccessRequests();
+    res.json({ rows });
+  } catch (error) {
+    incrementMetric("settlement_failure");
+    res.status(401).json({ error: error instanceof Error ? error.message : "Unauthorized admin request." });
   }
 });
 
@@ -415,6 +490,7 @@ app.post("/api/assistant", async (req, res) => {
 
   try {
     await assertSignedRequest(req.headers, "assistant:ask", { prompt, history });
+    incrementMetric("assistant_usage");
     const completion = await getAssistantReply(prompt, history);
     res.json(completion);
   } catch (error) {
@@ -445,19 +521,24 @@ app.post("/api/assistant/chat", rateLimit(30, "assistant-chat"), async (req, res
 
 async function handleCreativeUpload(req: Request, res: Response) {
   try {
+    incrementMetric("assistant_usage");
     const signedMeta = {
       filename: String(req.headers["x-adnode-upload-filename"] ?? ""),
       size: Number(req.headers["x-adnode-upload-size"] ?? 0),
       type: String(req.headers["x-adnode-upload-type"] ?? "application/octet-stream"),
     };
-    await assertSignedRequest(req.headers, "uploads:creative", signedMeta);
+    const signer = await assertSignedRequest(req.headers, "uploads:creative", signedMeta);
+    await assertCreativeUploadQuota(signer, signedMeta.size, signedMeta.type);
     const file = await parseMultipartUpload(req);
     if (file.filename !== signedMeta.filename || file.buffer.byteLength !== signedMeta.size || file.mimeType !== signedMeta.type) {
       throw new Error("Upload metadata does not match authorization payload.");
     }
     const uri = await uploadBufferToPinata(file);
+    incrementMetric("upload_success");
     res.status(201).json({ uri });
   } catch (error) {
+    incrementMetric("upload_failure");
+    logError("creative_upload_failed", { error: error instanceof Error ? error.message : "Creative upload failed." });
     const message = error instanceof Error ? error.message : "Creative upload failed.";
     res.status(message.toLowerCase().includes("authorization") || message.toLowerCase().includes("unauthorized") || message.toLowerCase().includes("signature") ? 401 : 400).json({ error: message });
   }
@@ -471,6 +552,9 @@ const port = Number(process.env.PORT || 4000);
 getDatabaseReady().then((databaseReady) => {
   if (databaseReady) {
     console.log("MongoDB connected for AdNode API.");
+    void ensureDatabaseIndexes().catch((error) => {
+      logError("database_index_bootstrap_failed", { error: error instanceof Error ? error.message : "Index bootstrap failed." });
+    });
   } else {
     console.warn("MongoDB unavailable, starting AdNode API in local fallback mode.");
   }

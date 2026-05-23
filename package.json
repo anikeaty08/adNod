@@ -9,6 +9,8 @@
     "worker:settlement": "tsx scripts/settlement-worker.ts",
     "build": "next build",
     "preview": "vite preview",
+    "test": "npm run test:server && npm run test:contracts",
+    "test:server": "tsx --test tests/server/*.test.ts",
     "test:contracts": "npx hardhat test",
     "deploy:contracts": "npx hardhat run scripts/deploy.cjs",
     "deploy:helium": "npx hardhat run scripts/deploy.cjs --network fhenixHelium",
