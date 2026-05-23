@@ -1,4 +1,5 @@
 import { buildAdnodeAuthMessage, adnodeAuthHeaders } from "./adnode-auth";
+import { ADNODE_CHAIN_ID } from "./chain";
 
 // Default to same-origin API (works on Vercel + local Next dev). Override via NEXT_PUBLIC_API_URL if you host an external API.
 const DEFAULT_API_BASE = "";
@@ -20,9 +21,11 @@ export async function signedPostJson<T>(
   address: `0x${string}`,
 ): Promise<T> {
   const ts = String(Date.now());
-  const message = buildAdnodeAuthMessage(action, address, ts, payload);
+  const nonce = crypto.randomUUID();
+  const chainId = String(ADNODE_CHAIN_ID);
+  const message = buildAdnodeAuthMessage(action, address, ts, payload, nonce, chainId);
   const signature = await signMessageAsync({ message });
-  const headers = adnodeAuthHeaders(action, address, ts, signature);
+  const headers = adnodeAuthHeaders(action, address, ts, nonce, chainId, signature);
   const res = await fetch(`${getApiBase()}${path}`, {
     method: "POST",
     headers,
@@ -129,10 +132,15 @@ export async function signedPostMultipart(
   address: `0x${string}`,
 ): Promise<{ uri: string }> {
   const ts = String(Date.now());
-  const message = buildAdnodeAuthMessage(action, address, ts, signPayload);
+  const nonce = crypto.randomUUID();
+  const chainId = String(ADNODE_CHAIN_ID);
+  const message = buildAdnodeAuthMessage(action, address, ts, signPayload, nonce, chainId);
   const signature = await signMessageAsync({ message });
-  const headers = adnodeAuthHeaders(action, address, ts, signature);
+  const headers = adnodeAuthHeaders(action, address, ts, nonce, chainId, signature);
   delete headers["Content-Type"];
+  headers["x-adnode-upload-filename"] = String(signPayload.filename ?? "");
+  headers["x-adnode-upload-size"] = String(signPayload.size ?? "");
+  headers["x-adnode-upload-type"] = String(signPayload.type ?? "");
   const form = new FormData();
   form.append(fieldName, file);
   const res = await fetch(`${getApiBase()}${path}`, { method: "POST", headers, body: form });

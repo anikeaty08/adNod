@@ -2,7 +2,8 @@ import adRegistryAbi from "../lib/abi/registry-abi.json" with { type: "json" };
 import { getCampaigns } from "./campaign-store.js";
 import { getSlots } from "./slot-store.js";
 import { adRegistryAddress, serverPublicClient as publicClient } from "./chain-state.js";
-import { createMeasurementToken } from "./measurement.js";
+import { createMeasurementNonce, createMeasurementToken, hashPageUrl } from "./measurement.js";
+import { strictModeEnabled } from "./runtime.js";
 
 function getIpfsGatewayUrl(uri: string) {
   if (uri.startsWith("ipfs://")) {
@@ -44,21 +45,6 @@ async function resolveAssetKind(assetUrl: string) {
 
   if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".gif") || lower.endsWith(".svg") || lower.endsWith(".webp")) {
     return "image" as const;
-  }
-
-  try {
-    const response = await fetch(assetUrl, { method: "HEAD" });
-    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-
-    if (contentType.startsWith("video/")) {
-      return "video" as const;
-    }
-
-    if (contentType.startsWith("image/")) {
-      return "image" as const;
-    }
-  } catch {
-    return "unknown" as const;
   }
 
   return "unknown" as const;
@@ -135,6 +121,7 @@ export async function getPublicSlotById(slotId: number) {
         siteName?: string;
         siteUrl?: string;
         dailyTrafficEstimate?: string;
+        slotKey?: string;
       }
     | undefined;
 
@@ -144,6 +131,7 @@ export async function getPublicSlotById(slotId: number) {
     siteName: metadataItem?.siteName || siteName,
     siteUrl: metadataItem?.siteUrl || "",
     dailyTrafficEstimate: metadataItem?.dailyTrafficEstimate || "",
+    slotKey: metadataItem?.slotKey || "",
     category,
     active,
     assignedCampaignId: Number(assignedCampaignId),
@@ -172,7 +160,7 @@ export function buildEmbedScript(origin: string, options: { slotId?: number; slo
   const identifier = options.slotKey ? String(options.slotKey) : String(options.slotId ?? "");
   const param = options.slotKey ? "slotKey" : "slotId";
 
-  return `(function(){\n  var identifier = ${JSON.stringify(identifier)};\n  var origin = ${safeOrigin};\n  var selector = '[data-adnode-slot=\"' + identifier + '\"]';\n  var mount = document.querySelector(selector);\n  if (!mount) {\n    mount = document.createElement('div');\n    mount.setAttribute('data-adnode-slot', identifier);\n    document.currentScript && document.currentScript.parentNode && document.currentScript.parentNode.insertBefore(mount, document.currentScript);\n  }\n  mount.innerHTML = '';\n  var frame = document.createElement('iframe');\n  frame.src = origin + '/api/embed?mode=frame&' + ${JSON.stringify(param)} + '=' + encodeURIComponent(identifier);\n  frame.loading = 'lazy';\n  frame.style.width = '100%';\n  frame.style.minHeight = '280px';\n  frame.style.border = '0';\n  frame.style.borderRadius = '20px';\n  frame.style.overflow = 'hidden';\n  frame.setAttribute('title', 'AdNode Slot ' + identifier);\n  mount.appendChild(frame);\n})();`;
+  return `(function(){\n  var identifier = ${JSON.stringify(identifier)};\n  var origin = ${safeOrigin};\n  var selector = '[data-adnode-slot=\"' + identifier + '\"]';\n  var mount = document.querySelector(selector);\n  if (!mount) {\n    mount = document.createElement('div');\n    mount.setAttribute('data-adnode-slot', identifier);\n    document.currentScript && document.currentScript.parentNode && document.currentScript.parentNode.insertBefore(mount, document.currentScript);\n  }\n  mount.innerHTML = '';\n  var frame = document.createElement('iframe');\n  var sessionKey = 'adnode-session-' + identifier;\n  var sessionId = '';\n  try {\n    sessionId = window.sessionStorage.getItem(sessionKey) || '';\n    if (!sessionId) {\n      sessionId = window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2);\n      window.sessionStorage.setItem(sessionKey, sessionId);\n    }\n  } catch (e) {\n    sessionId = String(Date.now()) + '-' + Math.random().toString(16).slice(2);\n  }\n  var params = 'mode=frame&' + ${JSON.stringify(param)} + '=' + encodeURIComponent(identifier) + '&sessionId=' + encodeURIComponent(sessionId) + '&pageUrl=' + encodeURIComponent(window.location.href) + '&publisherOrigin=' + encodeURIComponent(window.location.origin);\n  frame.src = origin + '/api/embed?' + params;\n  frame.loading = 'lazy';\n  frame.style.width = '100%';\n  frame.style.minHeight = '280px';\n  frame.style.border = '0';\n  frame.style.borderRadius = '20px';\n  frame.style.overflow = 'hidden';\n  frame.setAttribute('title', 'AdNode Slot ' + identifier);\n  mount.appendChild(frame);\n})();`;
 }
 
 export function buildEmbedFrameHtml(
@@ -180,6 +168,8 @@ export function buildEmbedFrameHtml(
   options: {
     origin: string;
     measurementToken: string;
+    pageUrl?: string;
+    publisherOrigin?: string;
   },
 ) {
   const title = escapeHtml(campaign.title);
@@ -189,6 +179,8 @@ export function buildEmbedFrameHtml(
   const safeOrigin = escapeHtml(options.origin);
   const safeMeasurementToken = escapeHtml(options.measurementToken);
   const creativeUrlJs = JSON.stringify(campaign.assetUrl);
+  const measuredPageUrlJs = JSON.stringify(options.pageUrl || "");
+  const publisherOriginJs = JSON.stringify(options.publisherOrigin || "");
 
   const media =
     campaign.assetKind === "video"
@@ -307,8 +299,9 @@ export function buildEmbedFrameHtml(
           var payload = JSON.stringify({
             token: token,
             eventType: type,
-            pageUrl: window.location.href,
-            referrer: document.referrer || ""
+            pageUrl: ${measuredPageUrlJs} || window.location.href,
+            referrer: document.referrer || "",
+            publisherOrigin: ${publisherOriginJs}
           });
 
           if (navigator.sendBeacon) {
@@ -340,11 +333,6 @@ export function buildEmbedFrameHtml(
           clearTimeout(impressionTimer);
           impressionTimer = null;
         }
-
-        window.addEventListener("load", function () {
-          // Fallback: if the embed can't observe viewability, still send after 5s.
-          scheduleImpression();
-        }, { once: true });
 
         var root = document.getElementById("adnode-root");
         if (root) {
@@ -385,12 +373,22 @@ export function buildEmbedFrameHtml(
 export function createEmbedFramePayload(
   campaign: Awaited<ReturnType<typeof getPublicCampaignBySlotId>>,
   origin: string,
+  context: { slotKey?: string; publisherOrigin?: string; pageUrl?: string; sessionId?: string } = {},
 ) {
+  const pageUrl = context.pageUrl || "";
+  if (strictModeEnabled() && (!context.slotKey || !context.publisherOrigin || !pageUrl || !context.sessionId)) {
+    throw new Error("Secure embed context requires slotKey, publisherOrigin, pageUrl, and sessionId.");
+  }
   return {
     campaign,
     measurementToken: createMeasurementToken({
       chainCampaignId: campaign.id,
       chainSlotId: campaign.slotId,
+      slotKey: context.slotKey || "",
+      publisherOrigin: context.publisherOrigin || "",
+      pageUrlHash: pageUrl ? hashPageUrl(pageUrl) : "",
+      sessionId: context.sessionId || createMeasurementNonce(),
+      nonce: createMeasurementNonce(),
     }),
     origin,
   };

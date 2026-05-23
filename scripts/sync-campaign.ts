@@ -1,7 +1,9 @@
 import "dotenv/config";
 
+import { randomUUID } from "node:crypto";
 import { buildAdnodeAuthMessage, adnodeAuthHeaders } from "../lib/adnode-auth";
 import { privateKeyToAccount } from "viem/accounts";
+import { getConfiguredChainId } from "../server/runtime";
 
 function env(name: string): string | undefined {
   const v = process.env[name];
@@ -53,9 +55,11 @@ async function main() {
 
   const action = "campaigns:create";
   const ts = String(Date.now());
-  const message = buildAdnodeAuthMessage(action, account.address, ts, payload);
+  const nonce = randomUUID();
+  const chainId = String(getConfiguredChainId());
+  const message = buildAdnodeAuthMessage(action, account.address, ts, payload, nonce, chainId);
   const signature = await account.signMessage({ message });
-  const headers = adnodeAuthHeaders(action, account.address, ts, signature);
+  const headers = adnodeAuthHeaders(action, account.address, ts, nonce, chainId, signature);
 
   const res = await fetch(`${apiBase()}/api/campaigns`, {
     method: "POST",

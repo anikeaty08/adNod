@@ -1,9 +1,16 @@
 {
   "network": "fhenixHelium",
+  "chainId": 8008135,
+  "explorerUrl": "https://explorer.helium.fhenix.zone",
   "payoutWrapper": "0x0000000000000000000000000000000000000000",
   "wrappedNativeToken": "0x0000000000000000000000000000000000000000",
   "adRegistry": "0x0000000000000000000000000000000000000000",
   "adAnalytics": "0x0000000000000000000000000000000000000000",
+  "accessApprover": null,
+  "deployer": null,
+  "blockNumber": null,
+  "txHashes": {},
+  "abiVersion": "pending-deploy",
   "deployedAt": "",
   "comment": "Run: npx hardhat run scripts/deploy.cjs --network fhenixHelium (requires PRIVATE_KEY + WRAPPED_NATIVE_TOKEN_ADDRESS). This file is overwritten with real addresses."
 }

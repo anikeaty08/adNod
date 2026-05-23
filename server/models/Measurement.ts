@@ -13,7 +13,22 @@ const MeasurementSchema = new Schema(
     pageUrl: { type: String, default: "" },
     referrer: { type: String, default: "" },
     fingerprint: { type: String, required: true },
-    status: { type: String, enum: ["accepted", "duplicate", "settled", "pending_chain"], default: "accepted" },
+    settlementId: { type: String, required: true },
+    sessionId: { type: String, default: "" },
+    nonce: { type: String, default: "" },
+    publisherOrigin: { type: String, default: "" },
+    pageUrlHash: { type: String, default: "" },
+    billable: { type: Boolean, default: true },
+    fraudStatus: { type: String, enum: ["clean", "review", "rejected"], default: "clean" },
+    fraudScore: { type: Number, default: 0 },
+    fraudReasons: { type: [String], default: [] },
+    reviewHash: { type: String, default: "" },
+    counterTxHash: { type: String, default: "" },
+    countedAt: { type: Date, default: null },
+    meteredAt: { type: Date, default: null },
+    pendingPayoutWei: { type: String, default: "0" },
+    pendingImpressionUnits: { type: Number, default: 0 },
+    status: { type: String, enum: ["accepted", "duplicate", "settled", "pending_chain", "review", "rejected"], default: "accepted" },
     settlementTxHash: { type: String, default: "" },
     lastError: { type: String, default: "" },
     settledAt: { type: Date, default: null },
@@ -22,5 +37,10 @@ const MeasurementSchema = new Schema(
     timestamps: true,
   },
 );
+
+MeasurementSchema.index({ chainCampaignId: 1, chainSlotId: 1, eventType: 1, settlementId: 1 }, { unique: true });
+MeasurementSchema.index({ status: 1, createdAt: 1 });
+MeasurementSchema.index({ billable: 1, fraudStatus: 1, status: 1, createdAt: 1 });
+MeasurementSchema.index({ chainCampaignId: 1, chainSlotId: 1, eventType: 1, createdAt: 1 });
 
 export const MeasurementModel = models.Measurement || model("Measurement", MeasurementSchema);

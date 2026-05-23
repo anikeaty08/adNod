@@ -12,7 +12,22 @@ export interface MeasurementRecord {
   pageUrl: string;
   referrer: string;
   fingerprint: string;
-  status: "accepted" | "duplicate" | "settled" | "pending_chain";
+  settlementId: string;
+  sessionId?: string;
+  nonce?: string;
+  publisherOrigin?: string;
+  pageUrlHash?: string;
+  billable?: boolean;
+  fraudStatus?: "clean" | "review" | "rejected";
+  fraudScore?: number;
+  fraudReasons?: string[];
+  reviewHash?: string;
+  counterTxHash?: string;
+  countedAt?: string | Date | null;
+  meteredAt?: string | Date | null;
+  pendingPayoutWei?: string;
+  pendingImpressionUnits?: number;
+  status: "accepted" | "duplicate" | "settled" | "pending_chain" | "review" | "rejected";
   settlementTxHash?: string;
   lastError?: string;
   settledAt?: string | Date | null;
@@ -23,16 +38,19 @@ const memoryMeasurements = new Map<string, MeasurementRecord>();
 export async function recordMeasurement(payload: Omit<MeasurementRecord, "status">) {
   try {
     await connectDatabase();
-    const existing = await MeasurementModel.findOne({ eventKey: payload.eventKey }).lean();
-    if (existing) {
+    try {
+      const created = await MeasurementModel.create({
+        ...payload,
+        status: payload.billable === false ? (payload.fraudStatus === "rejected" ? "rejected" : "review") : "accepted",
+      });
+      return { duplicate: false, record: created.toObject() as MeasurementRecord };
+    } catch (error) {
+      if ((error as { code?: number })?.code !== 11000) throw error;
+      const existing = await MeasurementModel.findOne({
+        $or: [{ eventKey: payload.eventKey }, { settlementId: payload.settlementId }],
+      }).lean();
       return { duplicate: true, record: existing as unknown as MeasurementRecord };
     }
-
-    const created = await MeasurementModel.create({
-      ...payload,
-      status: "accepted",
-    });
-    return { duplicate: false, record: created.toObject() as MeasurementRecord };
   } catch (error) {
     if (strictModeEnabled()) throw error;
     if (memoryMeasurements.has(payload.eventKey)) {
@@ -41,7 +59,7 @@ export async function recordMeasurement(payload: Omit<MeasurementRecord, "status
 
     const record: MeasurementRecord = {
       ...payload,
-      status: "accepted",
+      status: payload.billable === false ? (payload.fraudStatus === "rejected" ? "rejected" : "review") : "accepted",
       settlementTxHash: "",
       lastError: "",
       settledAt: null,
@@ -71,14 +89,14 @@ export async function updateMeasurementStatus(eventKey: string, updates: Partial
 export async function listPendingMeasurements(limit = 50) {
   try {
     await connectDatabase();
-    return (await MeasurementModel.find({ status: { $in: ["accepted", "pending_chain"] } })
+    return (await MeasurementModel.find({ status: { $in: ["accepted", "pending_chain"] }, billable: { $ne: false }, fraudStatus: "clean" })
       .sort({ createdAt: 1 })
       .limit(limit)
       .lean()) as unknown as MeasurementRecord[];
   } catch (error) {
     if (strictModeEnabled()) throw error;
     return Array.from(memoryMeasurements.values())
-      .filter((item) => item.status === "accepted" || item.status === "pending_chain")
+      .filter((item) => (item.status === "accepted" || item.status === "pending_chain") && item.billable !== false && item.fraudStatus !== "review" && item.fraudStatus !== "rejected")
       .slice(0, limit);
   }
 }

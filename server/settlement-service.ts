@@ -3,7 +3,7 @@ import { Encryptable } from "@cofhe/sdk";
 import { createCofheClient, createCofheConfig } from "@cofhe/sdk/node";
 import { arbSepolia } from "@cofhe/sdk/chains";
 import { privateKeyToAccount } from "viem/accounts";
-import { createPublicClient, createWalletClient, defineChain, formatEther, http, parseEther } from "viem";
+import { createPublicClient, createWalletClient, defineChain, formatEther, http, keccak256, parseEther, stringToBytes } from "viem";
 import { writeContract } from "viem/actions";
 import adAnalyticsAbi from "../lib/abi/analytics-abi.json" with { type: "json" };
 import adRegistryAbi from "../lib/abi/registry-abi.json" with { type: "json" };
@@ -12,9 +12,17 @@ import { listPendingMeasurements } from "./measurement-store.js";
 import { incrementAcceptedImpression, markSettledImpressionUnits } from "./settlement-state-store.js";
 import { updateMeasurementStatus, type MeasurementRecord } from "./measurement-store.js";
 import { arbitrumSepolia } from "viem/chains";
-import { FHELIUM_CHAIN_ID, getConfiguredChainId } from "./runtime.js";
+import { FHELIUM_CHAIN_ID, getConfiguredChainId, strictModeEnabled } from "./runtime.js";
+import { incrementMetric, logError } from "./observability.js";
 
-const settlementPrivateKey = process.env.SETTLEMENT_PRIVATE_KEY || process.env.PRIVATE_KEY;
+function getSettlementPrivateKey() {
+  const dedicatedKey = process.env.SETTLEMENT_PRIVATE_KEY;
+  if (dedicatedKey) return dedicatedKey;
+  if (strictModeEnabled()) {
+    throw new Error("SETTLEMENT_PRIVATE_KEY is required for production settlement writes.");
+  }
+  return process.env.PRIVATE_KEY;
+}
 const chainId = getConfiguredChainId();
 const rpcUrl =
   process.env.VITE_FHENIX_RPC_URL ||
@@ -44,7 +52,7 @@ const chain =
 let cofheClientPromise: ReturnType<typeof createCofheClient> | null = null;
 
 function assertSettlementReady() {
-  if (!settlementPrivateKey) {
+  if (!getSettlementPrivateKey()) {
     throw new Error("SETTLEMENT_PRIVATE_KEY or PRIVATE_KEY is required for settlement writes.");
   }
   if (!adAnalyticsAddress) {
@@ -54,7 +62,8 @@ function assertSettlementReady() {
 
 function getClients() {
   assertSettlementReady();
-  const account = privateKeyToAccount((settlementPrivateKey!.startsWith("0x") ? settlementPrivateKey : `0x${settlementPrivateKey}`) as `0x${string}`);
+  const settlementPrivateKey = getSettlementPrivateKey()!;
+  const account = privateKeyToAccount((settlementPrivateKey.startsWith("0x") ? settlementPrivateKey : `0x${settlementPrivateKey}`) as `0x${string}`);
   const publicClient = createPublicClient({
     chain,
     transport: http(rpcUrl),
@@ -96,6 +105,20 @@ function computePayoutWei(rate: string, billingUnits: bigint) {
     throw new Error("Settlement payout exceeds uint64 encryption bound.");
   }
   return wei;
+}
+
+function toSettlementId(record: MeasurementRecord, suffix = "") {
+  return keccak256(
+    stringToBytes(
+      [
+        record.chainCampaignId,
+        record.chainSlotId,
+        record.eventType,
+        record.settlementId || record.eventKey,
+        suffix,
+      ].join(":"),
+    ),
+  );
 }
 
 const MAX_CPM_UNITS_PER_SETTLEMENT = 10_000n;
@@ -156,40 +179,68 @@ export async function syncMeasurementToChain(record: MeasurementRecord) {
   const { account, publicClient, walletClient } = getClients();
 
   const analyticsAddress = adAnalyticsAddress!;
-  let payoutWei = 0n;
+  let payoutWei = record.pendingPayoutWei ? BigInt(record.pendingPayoutWei) : 0n;
+  let pendingImpressionUnits = Number(record.pendingImpressionUnits ?? 0);
+  const eventId = toSettlementId(record, "event");
 
   if (record.eventType === "impression") {
-    await writeContract(walletClient, {
-      address: analyticsAddress,
-      abi: adAnalyticsAbi,
-      functionName: "recordImpression",
-      args: [BigInt(record.chainCampaignId)],
-      chain,
-      account,
-    });
+    if (!record.countedAt) {
+      const counterTxHash = await writeContract(walletClient, {
+        address: analyticsAddress,
+        abi: adAnalyticsAbi,
+        functionName: "recordImpression",
+        args: [BigInt(record.chainCampaignId), eventId],
+        chain,
+        account,
+      });
+      await updateMeasurementStatus(record.eventKey, {
+        status: "pending_chain",
+        counterTxHash,
+        countedAt: new Date(),
+        lastError: "",
+      });
+      record = { ...record, status: "pending_chain", counterTxHash, countedAt: new Date() };
+    }
 
-    if (record.pricingModel === "CPM") {
+    if (record.pricingModel === "CPM" && !record.meteredAt) {
       const state = await incrementAcceptedImpression(record.chainCampaignId, record.chainSlotId);
       const newlyBillableUnits = Math.floor(state.acceptedImpressions / 1000) - state.settledImpressionUnits;
       if (newlyBillableUnits > 0) {
-        await markSettledImpressionUnits(record.chainCampaignId, record.chainSlotId, newlyBillableUnits);
         payoutWei = computePayoutWei(record.rate, BigInt(newlyBillableUnits));
+        pendingImpressionUnits = newlyBillableUnits;
       }
+      await updateMeasurementStatus(record.eventKey, {
+        status: "pending_chain",
+        meteredAt: new Date(),
+        pendingPayoutWei: payoutWei.toString(),
+        pendingImpressionUnits,
+      });
+      record = { ...record, meteredAt: new Date(), pendingPayoutWei: payoutWei.toString(), pendingImpressionUnits };
     }
   }
 
   if (record.eventType === "click") {
-    await writeContract(walletClient, {
-      address: analyticsAddress,
-      abi: adAnalyticsAbi,
-      functionName: "recordClick",
-      args: [BigInt(record.chainCampaignId)],
-      chain,
-      account,
-    });
+    if (!record.countedAt) {
+      const counterTxHash = await writeContract(walletClient, {
+        address: analyticsAddress,
+        abi: adAnalyticsAbi,
+        functionName: "recordClick",
+        args: [BigInt(record.chainCampaignId), eventId],
+        chain,
+        account,
+      });
+      await updateMeasurementStatus(record.eventKey, {
+        status: "pending_chain",
+        counterTxHash,
+        countedAt: new Date(),
+        lastError: "",
+      });
+      record = { ...record, status: "pending_chain", counterTxHash, countedAt: new Date() };
+    }
 
     if (record.pricingModel === "CPC") {
       payoutWei = computePayoutWei(record.rate, 1n);
+      record = { ...record, pendingPayoutWei: payoutWei.toString() };
     }
   }
 
@@ -200,16 +251,24 @@ export async function syncMeasurementToChain(record: MeasurementRecord) {
       address: analyticsAddress,
       abi: adAnalyticsAbi,
       functionName: "creditDeveloperEarnings",
-      args: [BigInt(record.chainCampaignId), BigInt(record.chainSlotId), payoutWei, encryptedAmount],
+      args: [BigInt(record.chainCampaignId), BigInt(record.chainSlotId), payoutWei, toSettlementId(record, record.pricingModel === "CPM" ? String(payoutWei) : ""), encryptedAmount],
       chain,
       account,
     });
+    if (record.eventType === "impression" && record.pricingModel === "CPM") {
+      if (pendingImpressionUnits > 0) {
+        await markSettledImpressionUnits(record.chainCampaignId, record.chainSlotId, pendingImpressionUnits);
+      }
+    }
     await updateMeasurementStatus(record.eventKey, {
       status: "settled",
       settlementTxHash: txHash,
       lastError: "",
       settledAt: new Date(),
+      pendingPayoutWei: "0",
+      pendingImpressionUnits: 0,
     });
+    incrementMetric("settlement_success");
     return { status: "settled" as const, txHash, payoutEth: formatEther(payoutWei) };
   }
 
@@ -219,10 +278,16 @@ export async function syncMeasurementToChain(record: MeasurementRecord) {
     lastError: "",
     settledAt: new Date(),
   });
+  incrementMetric("settlement_success");
   return { status: "recorded" as const, txHash: "", payoutEth: "0" };
 }
 
 export async function markMeasurementPending(record: MeasurementRecord, error: unknown) {
+  incrementMetric("settlement_failure");
+  logError("settlement_pending", {
+    eventKey: record.eventKey,
+    error: error instanceof Error ? error.message : "Chain sync failed.",
+  });
   await updateMeasurementStatus(record.eventKey, {
     status: "pending_chain",
     lastError: error instanceof Error ? error.message : "Chain sync failed.",

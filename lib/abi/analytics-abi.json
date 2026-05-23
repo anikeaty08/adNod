@@ -74,6 +74,12 @@
       },
       {
         "indexed": true,
+        "internalType": "bytes32",
+        "name": "eventId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
         "internalType": "address",
         "name": "reporter",
         "type": "address"
@@ -99,6 +105,12 @@
       },
       {
         "indexed": true,
+        "internalType": "bytes32",
+        "name": "settlementId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
         "internalType": "address",
         "name": "developer",
         "type": "address"
@@ -121,6 +133,12 @@
         "internalType": "uint256",
         "name": "campaignId",
         "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "eventId",
+        "type": "bytes32"
       },
       {
         "indexed": true,
@@ -249,6 +267,25 @@
   {
     "inputs": [
       {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "countedEvents",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "campaignId",
         "type": "uint256"
@@ -262,6 +299,11 @@
         "internalType": "uint256",
         "name": "payoutAmountWei",
         "type": "uint256"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "settlementId",
+        "type": "bytes32"
       },
       {
         "components": [
@@ -400,6 +442,11 @@
         "internalType": "uint256",
         "name": "campaignId",
         "type": "uint256"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "eventId",
+        "type": "bytes32"
       }
     ],
     "name": "recordClick",
@@ -413,6 +460,11 @@
         "internalType": "uint256",
         "name": "campaignId",
         "type": "uint256"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "eventId",
+        "type": "bytes32"
       }
     ],
     "name": "recordImpression",

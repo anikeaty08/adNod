@@ -18,4 +18,7 @@ const SlotSchema = new Schema(
   },
 );
 
+SlotSchema.index({ developer: 1, createdAt: -1 });
+SlotSchema.index({ assignedCampaignId: 1 });
+
 export const SlotModel = models.Slot || model("Slot", SlotSchema);
