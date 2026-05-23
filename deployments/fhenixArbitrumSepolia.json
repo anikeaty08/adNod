@@ -2,14 +2,18 @@
   "network": "fhenixArbitrumSepolia",
   "chainId": 421614,
   "explorerUrl": "https://sepolia.arbiscan.io",
-  "payoutWrapper": "0xA3cA85E6253C388da121E39268513C900F010565",
+  "payoutWrapper": "0x9e4C5699f6C6f010e9E2d2d067e111AC8f04ED00",
   "wrappedNativeToken": "0xc556bae1e86b2ae9c22ea5e036b07e55e7596074",
-  "adRegistry": "0xA1F37E5a97dDCCa41E4831a59FA2876540bB4f12",
-  "adAnalytics": "0x0c51Ca82a5C8503eA172bb374038f3eb89E73786",
+  "adRegistry": "0xC1eE1ACEe891D36Ff2Eea860d5bA2350C97daB5a",
+  "adAnalytics": "0x1627C035Fee0b96D0267299D686f4EACEEbe2D0d",
   "accessApprover": null,
-  "deployer": null,
-  "blockNumber": null,
-  "txHashes": {},
-  "abiVersion": "pre-non-replayable-settlement",
-  "deployedAt": "2026-04-19T03:04:58.515Z"
+  "deployer": "0x00aA88bD731590002d202Fa4078Be402544F7C10",
+  "blockNumber": 270510506,
+  "txHashes": {
+    "payoutWrapper": "0x7b2d74a86e691cf64f87d1d487d119c3200ecf7ca5442f16c4c4bfe2f4618b2e",
+    "adRegistry": "0xb9430f8de5c709af5655399dfb027ccb6528517d7aa35628e2b034d54f02e505",
+    "adAnalytics": "0x8e19a9bf88a768b3d97ba0725e4bf145595610b3629e6b47acca87c1965d1077"
+  },
+  "abiVersion": "non-replayable-settlement-v1",
+  "deployedAt": "2026-05-23T14:56:49.999Z"
 }
