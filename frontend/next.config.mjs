@@ -2,6 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
+    externalDir: true,
     workerThreads: true,
   },
   transpilePackages: ["@cofhe/sdk"],

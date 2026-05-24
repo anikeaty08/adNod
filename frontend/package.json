@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node run-next.mjs dev -p 3000",
-    "build": "node run-next.mjs build",
-    "start": "node run-next.mjs start -p 3000"
+    "dev": "node --env-file=../.env run-next.mjs dev -p 3000",
+    "build": "node --env-file=../.env run-next.mjs build",
+    "start": "node --env-file=../.env run-next.mjs start -p 3000"
   }
 }

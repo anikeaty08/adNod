@@ -86,7 +86,7 @@ flowchart TD
 | Deploy | `scripts/deploy.cjs` | Deploy contracts and write `deployments/<network>.json` plus ABIs |
 | Deploy | `deployments/fhenixArbitrumSepolia.json` | Arbitrum Sepolia deployment config |
 | Deploy | `deployments/fhenixHelium.json` | Fhenix Helium deployment config |
-| Frontend | `app/`, `components/`, `lib/` | Next.js app, Studio, wallet, embeds, assistant |
+| Frontend | `frontend/app/`, `frontend/components/`, `lib/` | Next.js app, Studio, wallet, embeds, assistant; shared client utilities stay in root `lib/` |
 | Backend | `server/` | Services, repositories, auth, measurement, settlement, assistant |
 | Serverless | `api/[...path].ts` | Vercel API entrypoint sharing server behavior |
 | Workers | `scripts/settlement-worker.ts` | Background settlement replay/processing |

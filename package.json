@@ -4,20 +4,20 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "dev:api": "tsx server/index.ts",
-    "worker:settlement": "tsx scripts/settlement-worker.ts",
-    "build": "next build",
+    "dev": "npm --prefix frontend run dev",
+    "dev:api": "npm --prefix backend run dev",
+    "worker:settlement": "npm --prefix backend run worker:settlement",
+    "build": "npm --prefix frontend run build",
     "preview": "vite preview",
     "test": "npm run test:server && npm run test:contracts",
     "test:server": "tsx --test tests/server/*.test.ts",
     "test:contracts": "npx hardhat test",
     "deploy:contracts": "npx hardhat run scripts/deploy.cjs",
     "deploy:helium": "npx hardhat run scripts/deploy.cjs --network fhenixHelium",
-    "smoke:marketplace": "tsx scripts/smoke-marketplace-flow.ts",
+    "smoke:marketplace": "npm --prefix backend run smoke:marketplace",
     "create:campaign": "tsx scripts/create-campaign.ts",
     "sync:campaign": "tsx scripts/sync-campaign.ts",
-    "start": "next start"
+    "start": "npm --prefix frontend run start"
   },
   "dependencies": {
     "@barba/core": "^2.10.3",

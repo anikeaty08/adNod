@@ -15,9 +15,12 @@
     "incremental": true,
     "plugins": [{ "name": "next" }],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./frontend/*", "./*"],
+      "@/components/*": ["./frontend/components/*"],
+      "@/app/*": ["./frontend/app/*"],
+      "@/lib/*": ["./lib/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": ["frontend/next-env.d.ts", "**/*.ts", "**/*.tsx", "frontend/.next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }
