@@ -1,6 +1,10 @@
 import { getCampaigns } from "./campaign-store.js";
 import { getSlots } from "./slot-store.js";
-import { getRegistryChainHealth } from "./chain-state.js";
+import { adRegistryAddress, getRegistryChainHealth, serverPublicClient } from "./chain-state.js";
+import { connectDatabase } from "./db.js";
+import { MeasurementModel } from "./models/Measurement.js";
+import adRegistryAbi from "../lib/abi/registry-abi.json" with { type: "json" };
+import { formatEther } from "viem";
 
 export interface AssistantMessage {
   role: "user" | "assistant";
@@ -79,6 +83,194 @@ function normalizePrompt(prompt: string) {
 function getFaqReply(prompt: string) {
   const normalized = normalizePrompt(prompt);
   return FAQ_ENTRIES.find((entry) => entry.test(normalized))?.reply ?? null;
+}
+
+function isVaguePrompt(normalized: string) {
+  return /^(hi|hello|hey|yo|sup|everything|help|start|status|account|overview|dashboard|what now|next)$/i.test(normalized);
+}
+
+function wantsAccountData(normalized: string) {
+  return (
+    isVaguePrompt(normalized) ||
+    /\b(credit|fund|funds|balance|spend|spent|withdraw|claim|claimable|earning|earnings|payout|campaign|slot|approval|approved|serving|settlement|pending|profile|account|next)\b/.test(
+      normalized,
+    )
+  );
+}
+
+async function safeRead<T>(fallback: T, fn: () => Promise<T>) {
+  try {
+    return await fn();
+  } catch {
+    return fallback;
+  }
+}
+
+async function readCampaignFunding(chainCampaignId: string) {
+  if (!adRegistryAddress || !/^\d+$/.test(chainCampaignId)) return null;
+  const registryAddress = adRegistryAddress;
+  return safeRead(null, async () => {
+    const [availableFunds, totalFunded, totalSettled] = (await serverPublicClient.readContract({
+      address: registryAddress,
+      abi: adRegistryAbi as any,
+      functionName: "getCampaignFunding",
+      args: [BigInt(chainCampaignId)],
+    })) as [bigint, bigint, bigint];
+    const active = (await serverPublicClient.readContract({
+      address: registryAddress,
+      abi: adRegistryAbi as any,
+      functionName: "isCampaignActive",
+      args: [BigInt(chainCampaignId)],
+    })) as boolean;
+    return {
+      availableFunds,
+      totalFunded,
+      totalSettled,
+      active,
+    };
+  });
+}
+
+async function readClaimableEarnings(address: string) {
+  if (!adRegistryAddress) return 0n;
+  const registryAddress = adRegistryAddress;
+  return safeRead(0n, async () => {
+    return (await serverPublicClient.readContract({
+      address: registryAddress,
+      abi: adRegistryAbi as any,
+      functionName: "claimableEarnings",
+      args: [address as `0x${string}`],
+    })) as bigint;
+  });
+}
+
+async function readAccessStatus(chainCampaignId: string, chainSlotId: string) {
+  if (!adRegistryAddress || !/^\d+$/.test(chainCampaignId) || !/^\d+$/.test(chainSlotId)) return "unknown";
+  const registryAddress = adRegistryAddress;
+  const status = await safeRead(-1, async () => {
+    return Number(
+      await serverPublicClient.readContract({
+        address: registryAddress,
+        abi: adRegistryAbi as any,
+        functionName: "accessStatus",
+        args: [BigInt(chainCampaignId), BigInt(chainSlotId)],
+      }),
+    );
+  });
+  return ["None", "Requested", "Approved", "Denied", "Revoked"][status] ?? "unknown";
+}
+
+async function getMeasurementSummary(campaignIds: string[], slotIds: string[]) {
+  try {
+    await connectDatabase();
+    const query = {
+      $or: [{ chainCampaignId: { $in: campaignIds } }, { chainSlotId: { $in: slotIds } }],
+    };
+    const [pending, settled, review] = await Promise.all([
+      MeasurementModel.countDocuments({ ...query, status: { $in: ["accepted", "pending_chain"] } }),
+      MeasurementModel.countDocuments({ ...query, status: "settled" }),
+      MeasurementModel.countDocuments({ ...query, status: { $in: ["review", "rejected"] } }),
+    ]);
+    return { pending, settled, review };
+  } catch {
+    return { pending: 0, settled: 0, review: 0 };
+  }
+}
+
+function eth(value: bigint) {
+  return `${formatEther(value)} ETH`;
+}
+
+async function getAccountAgentReply(prompt: string, address: string) {
+  const normalized = normalizePrompt(prompt);
+  if (!wantsAccountData(normalized)) return null;
+
+  const wallet = address.toLowerCase();
+  const [allCampaigns, allSlots, claimable] = await Promise.all([getCampaigns(), getSlots(), readClaimableEarnings(wallet)]);
+  const campaigns = ((Array.isArray(allCampaigns) ? allCampaigns : []) as Array<Record<string, unknown>>).filter(
+    (campaign) => String(campaign.advertiser ?? "").toLowerCase() === wallet,
+  );
+  const slots = ((Array.isArray(allSlots) ? allSlots : []) as Array<Record<string, unknown>>).filter(
+    (slot) => String(slot.developer ?? "").toLowerCase() === wallet,
+  );
+
+  const campaignIds = campaigns.map((campaign) => String(campaign.chainCampaignId ?? "")).filter(Boolean);
+  const slotIds = slots.map((slot) => String(slot.chainSlotId ?? "")).filter(Boolean);
+  const [fundingRows, measurementSummary] = await Promise.all([
+    Promise.all(campaignIds.slice(0, 8).map((id) => readCampaignFunding(id).then((funding) => ({ id, funding })))),
+    getMeasurementSummary(campaignIds, slotIds),
+  ]);
+
+  const totalAvailable = fundingRows.reduce((sum, row) => sum + (row.funding?.availableFunds ?? 0n), 0n);
+  const totalFunded = fundingRows.reduce((sum, row) => sum + (row.funding?.totalFunded ?? 0n), 0n);
+  const totalSettled = fundingRows.reduce((sum, row) => sum + (row.funding?.totalSettled ?? 0n), 0n);
+  const activeCampaigns = fundingRows.filter((row) => row.funding?.active).length;
+  const assignedSlots = slots.filter((slot) => String(slot.assignedCampaignId ?? "").trim()).length;
+
+  if (normalized.includes("withdraw") || normalized.includes("claim") || normalized.includes("earning") || normalized.includes("payout")) {
+    return {
+      reply: [
+        `**Withdraw status**`,
+        `Claimable publisher earnings: ${eth(claimable)}.`,
+        `Advertiser funds still available across your indexed campaigns: ${eth(totalAvailable)}.`,
+        claimable > 0n ? "You can withdraw publisher earnings from Studio > Publisher > Earnings." : "No publisher earnings are claimable right now.",
+        totalAvailable > 0n ? "To withdraw unspent advertiser funds, pause the campaign first, then withdraw from the campaign detail page." : null,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      model: "AdNode Account Agent",
+    };
+  }
+
+  if (normalized.includes("credit") || normalized.includes("fund") || normalized.includes("balance") || normalized.includes("spend") || normalized.includes("spent")) {
+    return {
+      reply: [
+        `**Campaign funds**`,
+        `Available: ${eth(totalAvailable)}.`,
+        `Total funded: ${eth(totalFunded)}.`,
+        `Total settled/spent: ${eth(totalSettled)}.`,
+        `Indexed campaigns owned by this wallet: ${campaigns.length}. Active on-chain in the checked set: ${activeCampaigns}.`,
+      ].join("\n"),
+      model: "AdNode Account Agent",
+    };
+  }
+
+  if (normalized.includes("slot") || normalized.includes("approval") || normalized.includes("approved") || normalized.includes("serving")) {
+    const rows = await Promise.all(
+      slots.slice(0, 5).map(async (slot) => {
+        const slotId = String(slot.chainSlotId ?? "");
+        const campaignId = String(slot.assignedCampaignId ?? "");
+        const access = campaignId ? await readAccessStatus(campaignId, slotId) : "not assigned";
+        return `Slot #${slotId || "?"}: ${String(slot.siteName ?? "Untitled")} | assigned campaign: ${campaignId || "none"} | access: ${access}`;
+      }),
+    );
+    return {
+      reply: [`**Publisher slots**`, `Owned slots: ${slots.length}. Assigned slots: ${assignedSlots}.`, ...rows].join("\n"),
+      model: "AdNode Account Agent",
+    };
+  }
+
+  const nextActions: string[] = [];
+  if (!campaigns.length) nextActions.push("Create and fund a campaign if you are advertising.");
+  if (!slots.length) nextActions.push("Register a publisher slot if you want to earn.");
+  if (campaigns.length && activeCampaigns === 0) nextActions.push("Resume or fund one campaign so it can serve.");
+  if (slots.length && assignedSlots === 0) nextActions.push("Request approval and assign a campaign to one slot.");
+  if (claimable > 0n) nextActions.push("Withdraw claimable publisher earnings.");
+  if (!nextActions.length) nextActions.push("Monitor settlement and keep campaigns funded.");
+
+  return {
+    reply: [
+      `**Account status**`,
+      `Wallet: ${wallet.slice(0, 6)}...${wallet.slice(-4)}`,
+      `Campaigns: ${campaigns.length} (${activeCampaigns} active in the checked set).`,
+      `Campaign funds available: ${eth(totalAvailable)}. Settled/spent: ${eth(totalSettled)}.`,
+      `Publisher slots: ${slots.length} (${assignedSlots} assigned).`,
+      `Claimable earnings: ${eth(claimable)}.`,
+      `Measurements: ${measurementSummary.pending} pending, ${measurementSummary.settled} settled, ${measurementSummary.review} review/rejected.`,
+      `Next: ${nextActions[0]}`,
+    ].join("\n"),
+    model: "AdNode Account Agent",
+  };
 }
 
 async function getDataReply(prompt: string) {
@@ -188,6 +380,8 @@ async function getGroqReply(prompt: string, history: AssistantMessage[], apiKey:
           role: "system",
           content: [
             "You are the AdNode AI assistant.",
+            "Do not give generic introductions for vague prompts like hi, hello, help, or everything.",
+            "For vague prompts, ask the user to connect/sign their wallet so you can inspect their account.",
             "Use AdNode terminology exactly.",
             "Hoster means advertiser.",
             "Developer means publisher.",
@@ -250,6 +444,14 @@ function polishAssistantText(text: string) {
 }
 
 export async function getAssistantReply(prompt: string, history: AssistantMessage[] = []) {
+  const normalized = normalizePrompt(prompt);
+  if (isVaguePrompt(normalized)) {
+    return {
+      reply: "Connect and sign your wallet so I can check your campaigns, slots, approvals, funds, settlements, and claimable earnings.",
+      model: "AdNode Account Agent",
+    };
+  }
+
   const faqReply = getFaqReply(prompt);
   if (faqReply) {
     return { reply: polishAssistantText(faqReply), model: "AdNode FAQ" };
@@ -257,6 +459,13 @@ export async function getAssistantReply(prompt: string, history: AssistantMessag
 
   const dataReply = await getDataReply(prompt);
   if (dataReply) return { ...dataReply, reply: polishAssistantText(dataReply.reply) };
+
+  if (wantsAccountData(normalized)) {
+    return {
+      reply: "Connect and sign your wallet so I can check your real account data. Without a wallet I can only answer public AdNode docs questions.",
+      model: "AdNode Account Agent",
+    };
+  }
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -266,4 +475,10 @@ export async function getAssistantReply(prompt: string, history: AssistantMessag
   const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
   const groq = await getGroqReply(prompt, history, apiKey, model);
   return { ...groq, reply: polishAssistantText(groq.reply) };
+}
+
+export async function getAccountAssistantReply(prompt: string, history: AssistantMessage[] = [], address: string) {
+  const accountReply = await getAccountAgentReply(prompt, address);
+  if (accountReply) return { ...accountReply, reply: polishAssistantText(accountReply.reply) };
+  return getAssistantReply(prompt, history);
 }

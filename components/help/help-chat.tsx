@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GripVertical, MessageCircle, Send, X } from "lucide-react";
-import { postAssistantChat } from "@/lib/adnode-api";
+import { useAccount, useSignMessage } from "wagmi";
+import { postAssistantChat, signedPostJson } from "@/lib/adnode-api";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -29,10 +30,12 @@ function readSavedPos(): { right: number; bottom: number } {
 }
 
 export function HelpChat() {
+  const { address, isConnected } = useAccount();
+  const { signMessageAsync } = useSignMessage();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>([
-    { role: "assistant", content: "Ask anything about AdNode — campaigns, embeds, claims, or the API." },
+    { role: "assistant", content: "Ask about campaigns, slots, approvals, funds, settlement, or withdrawals. Connect your wallet for account-specific answers." },
   ]);
   const [busy, setBusy] = useState(false);
   const [pos, setPos] = useState({ right: DEFAULT_RIGHT, bottom: DEFAULT_BOTTOM });
@@ -147,7 +150,11 @@ export function HelpChat() {
     setMsgs((m) => [...m, { role: "user", content: text }]);
     setBusy(true);
     try {
-      const res = await postAssistantChat<{ reply?: string; error?: string }>({ prompt: text, history });
+      const payload = { prompt: text, history };
+      const res =
+        isConnected && address
+          ? await signedPostJson<{ reply?: string; error?: string }>("/api/assistant", "assistant:ask", payload, signMessageAsync, address)
+          : await postAssistantChat<{ reply?: string; error?: string }>(payload);
       const reply = res.reply ?? (res as { error?: string }).error;
       setMsgs((m) => [...m, { role: "assistant", content: reply || "No reply." }]);
     } catch (e) {
@@ -162,7 +169,7 @@ export function HelpChat() {
       setBusy(false);
       queueMicrotask(() => endRef.current?.scrollIntoView({ behavior: "smooth" }));
     }
-  }, [busy, input, msgs]);
+  }, [address, busy, input, isConnected, msgs, signMessageAsync]);
 
   const onFabClick = useCallback(() => {
     if (suppressFabToggle.current) {

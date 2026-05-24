@@ -2,7 +2,7 @@ import "dotenv/config";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { createCampaign, getCampaignByChainId, getCampaigns, getDatabaseReady, sanitizeCampaignMetadata } from "./campaign-store.js";
 import { parseMultipartUpload, uploadBufferToPinata } from "./pinata.js";
-import { getAssistantReply, type AssistantMessage } from "./assistant.js";
+import { getAccountAssistantReply, getAssistantReply, type AssistantMessage } from "./assistant.js";
 import { buildEmbedFrameHtml, buildEmbedScript, createEmbedFramePayload, getPublicCampaignById, getPublicCampaignBySlotId } from "./public-campaigns.js";
 import { assignSlotCampaign, createSlot, getSlotByKey, getSlots, sanitizeSlotMetadata } from "./slot-store.js";
 import { assertSignedRequest } from "./request-auth.js";
@@ -490,9 +490,9 @@ app.post("/api/assistant", async (req, res) => {
   }
 
   try {
-    await assertSignedRequest(req.headers, "assistant:ask", { prompt, history });
+    const signer = await assertSignedRequest(req.headers, "assistant:ask", { prompt, history });
     incrementMetric("assistant_usage");
-    const completion = await getAssistantReply(prompt, history);
+    const completion = await getAccountAssistantReply(prompt, history, signer);
     res.json(completion);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Assistant request failed.";

@@ -7,7 +7,7 @@ import { getRegistryChainHealth, getCampaignHoster, getSlotDeveloper, getAssigne
 import { assertSignedRequest } from "../server/request-auth.js";
 import { readJsonBody } from "../server/http-body.js";
 import { parseMultipartUpload, uploadBufferToPinata } from "../server/pinata.js";
-import { getAssistantReply, type AssistantMessage } from "../server/assistant.js";
+import { getAccountAssistantReply, getAssistantReply, type AssistantMessage } from "../server/assistant.js";
 import { getPublicCampaignById, getPublicCampaignBySlotId, createEmbedFramePayload, buildEmbedFrameHtml, buildEmbedScript } from "../server/public-campaigns.js";
 import { assertBoundMeasurementToken, verifyMeasurementToken, buildMeasurementFingerprint, buildMeasurementEventKey, consumeMeasurementNonce, hashPageUrl } from "../server/measurement.js";
 import { recordMeasurement } from "../server/measurement-store.js";
@@ -57,9 +57,9 @@ async function handleAssistant(req: IncomingMessage, res: ServerResponse) {
   if (!prompt) return sendJson(res, 400, { error: "Prompt is required." });
 
   try {
-    await assertSignedRequest(req.headers, "assistant:ask", { prompt, history });
+    const signer = await assertSignedRequest(req.headers, "assistant:ask", { prompt, history });
     incrementMetric("assistant_usage");
-    const completion = await getAssistantReply(prompt, history);
+    const completion = await getAccountAssistantReply(prompt, history, signer);
     return sendJson(res, 200, completion);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Assistant request failed.";
