@@ -19,44 +19,76 @@ const sections: { id: string; title: string; blocks: Block[] }[] = [
     blocks: [
       {
         type: "p",
-        text: "AdNode runs on Fhenix Arbitrum Sepolia with CoFHE.",
+        text: "AdNode is an ad marketplace where advertisers create funded campaigns and publishers earn by placing approved ads on their sites.",
       },
       {
         type: "p",
-        text: "Roles: Hoster (advertiser) funds campaigns. Developer (publisher) earns from ad placements.",
+        text: "The app guides both sides through wallet actions: campaign creation, slot activation, access approval, ad embedding, settlement, and earning claims.",
       },
       {
         type: "cta",
         title: "Pick your path",
         items: [
-          { href: "/app/studio/publisher", label: "Publisher / developer", kind: "primary" },
-          { href: "/app/studio", label: "Studio", kind: "secondary" },
+          { href: "/app/studio/create", label: "Create campaign", kind: "primary" },
+          { href: "/app/studio/publisher", label: "Publisher studio", kind: "secondary" },
+          { href: "/app/studio/admin", label: "Admin approvals", kind: "secondary" },
         ],
       },
       {
         type: "ul",
         items: [
-          "Publishers: activate a placement on-chain, assign a matching campaign, paste an embed snippet.",
-          "Advertisers: create + fund campaigns from Studio; they become discoverable automatically.",
+          "Hosters create campaigns, fund escrow, pause/resume, and withdraw unspent funds.",
+          "Developers register slots, request access, assign approved campaigns, embed ads, and claim earnings.",
+          "Admins approve, deny, or revoke campaign-slot access before a publisher can serve a campaign.",
+          "The assistant answers public questions without a wallet and account-specific questions after a wallet signature.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "create-campaign",
+    title: "Create an ad campaign",
+    blocks: [
+      {
+        type: "p",
+        text: "Advertisers start by creating a campaign in Studio. A campaign includes the creative, category, budget, pricing model, and settlement rate publishers can earn from.",
+      },
+      {
+        type: "ul",
+        items: [
+          "Open New campaign from Studio.",
+          "Add the ad creative URL, campaign category, budget, and payout model.",
+          "Choose CPC for paid clicks or CPM for paid impression units.",
+          "Confirm the wallet transaction to create and fund the campaign.",
+          "After confirmation, the campaign appears in campaign lists for publishers to request access.",
+        ],
+      },
+      {
+        type: "cta",
+        title: "Advertiser actions",
+        items: [
+          { href: "/app/studio/create", label: "Create campaign", kind: "primary" },
+          { href: "/app/studio/campaigns", label: "View campaigns", kind: "secondary" },
         ],
       },
     ],
   },
   {
     id: "publisher-quickstart",
-    title: "Publisher quickstart",
+    title: "Publish an ad",
     blocks: [
       {
         type: "p",
-        text: "Activate a placement on-chain, get approved for a campaign, then embed it on your site.",
+        text: "Publishers create a placement slot, request access to a campaign, assign it after approval, and paste the embed on their site.",
       },
       {
         type: "ul",
         items: [
-          "Open Publisher -> Slots -> Activate placement (wallet tx).",
-          "Request access for a campaign id (wallet tx).",
-          "After machine approval, assign the campaign to your placement (wallet tx).",
-          "Open Embeds -> pick your placement -> copy code for your stack.",
+          "Open Publisher -> Slots and activate a placement with your wallet.",
+          "Open Campaigns, select a campaign, and request access for your slot.",
+          "Wait for admin approval.",
+          "Assign the approved campaign to your placement.",
+          "Copy the slotKey embed and paste it into your website.",
         ],
       },
       {
@@ -91,12 +123,36 @@ const sections: { id: string; title: string; blocks: Block[] }[] = [
     ],
   },
   {
+    id: "admin-approval",
+    title: "Admin approval",
+    blocks: [
+      {
+        type: "p",
+        text: "Campaign access is gated by admin approval. A publisher can request access for a campaign-slot pair, but assignment is blocked until an admin wallet approves it.",
+      },
+      {
+        type: "ul",
+        items: [
+          "The admin dashboard lists requested campaign-slot pairs.",
+          "An authorized admin reviews publisher access requests.",
+          "Approve, deny, and revoke actions are submitted from the admin wallet.",
+          "Publishers should refresh assignment state after the approval transaction confirms.",
+        ],
+      },
+      {
+        type: "cta",
+        title: "Admin screen",
+        items: [{ href: "/app/studio/admin", label: "Open approvals", kind: "primary" }],
+      },
+    ],
+  },
+  {
     id: "embed-reference",
     title: "Embed reference",
     blocks: [
       {
         type: "p",
-        text: "All embeds load from your AdNode deployment origin. Use slotKey if available (recommended). slotId also works, but slotKey is nicer to share publicly.",
+        text: "All embeds load from your AdNode deployment origin. Use slotKey if available. The embed passes session, page URL, and publisher origin context so measurement can reject stale, replayed, or mismatched events.",
       },
       {
         type: "code",
@@ -137,20 +193,61 @@ export function AdNodePlacement() {
   },
   {
     id: "api-reference",
-    title: "API reference",
+    title: "How the app runs",
     blocks: [
       {
         type: "p",
-        text: "The UI uses these endpoints. Public reads are normal JSON; embeds are HTML/JS.",
+        text: "Each marketplace action has a clear lifecycle. The user signs wallet actions for ownership and value movement, while the app records metadata, checks approvals, tracks measurements, and settles eligible events.",
       },
       {
         type: "ul",
         items: [
-          "GET /api/campaigns -> list campaign metadata (Home + Studio lists).",
-          "GET /api/slots -> list slot metadata (Publisher pages).",
-          "GET /api/campaign?id=4 -> campaign metadata for a single id.",
-          "GET /api/embed?mode=frame&slotKey=... -> hosted iframe HTML (embeds).",
-          "GET /api/embed?slotKey=... -> JavaScript embed (default mode).",
+          "Advertisers fund campaign escrow before ads can pay publishers.",
+          "Publishers own their slots with the connected wallet.",
+          "Admins approve campaign-slot access before assignment.",
+          "Embeds render the assigned campaign and send signed measurement context.",
+          "Accepted clicks or impression units become settlement candidates.",
+          "Settlement credits eligible publisher earnings exactly once.",
+          "Publishers claim available earnings from their wallet account.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "assistant",
+    title: "Assistant",
+    blocks: [
+      {
+        type: "p",
+        text: "The help chat works without a wallet for public questions and becomes account-aware after a connected wallet signs the assistant request.",
+      },
+      {
+        type: "ul",
+        items: [
+          "Public mode never exposes private account data.",
+          "Signed mode can inspect the connected wallet's campaigns, slots, approvals, funds, settlement state, measurement summaries, claimable earnings, and next actions.",
+          "The assistant is read-only. It does not create transactions, approve access, settle, claim, withdraw, or spend funds.",
+          "If a question needs private account data, the assistant asks the user to connect and sign first.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "operations",
+    title: "Earnings and settlement",
+    blocks: [
+      {
+        type: "p",
+        text: "AdNode does not let anyone invent arbitrary payouts. The campaign terms decide how much can be credited, and settled events cannot be replayed for extra earnings.",
+      },
+      {
+        type: "ul",
+        items: [
+          "CPC campaigns pay for unique accepted clicks.",
+          "CPM campaigns pay after completed 1000-impression units.",
+          "Suspicious or duplicate events are rejected or held for review.",
+          "Claimable earnings appear on the publisher earnings page.",
+          "Advertisers can pause campaigns and withdraw unspent funds when the campaign is inactive.",
         ],
       },
     ],
@@ -165,6 +262,9 @@ export function AdNodePlacement() {
           "Campaign: an advertiser/hoster on-chain ad with public settlement terms.",
           "Placement / slot: a publisher/developer on-chain inventory unit owned by your wallet.",
           "slotKey: an unguessable public key that maps to your on-chain slot id for embeds.",
+          "Access approval: admin-controlled permission for a campaign-slot pair.",
+          "Settlement epoch/event id: non-replayable accounting key used to prevent duplicate settlement.",
+          "Claimable earnings: developer payout reserved on-chain and available to claim.",
         ],
       },
     ],
@@ -322,7 +422,7 @@ export function DocsGitbook() {
             <ChevronLeft size={18} /> Previous
           </button>
           <p className="hidden text-center text-xs text-muted sm:block">
-            {active + 1} / {sections.length} · {sections[active]?.title}
+            {active + 1} / {sections.length} - {sections[active]?.title}
           </p>
           <button
             type="button"

@@ -8,6 +8,7 @@ build
 .hh-artifacts
 .hh-cache
 *.log
+.local-logs
 *.tsbuildinfo
 .env.local
 .env.*.local

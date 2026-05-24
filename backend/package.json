@@ -1,0 +1,10 @@
+{
+  "name": "adnode-backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=../.env ../node_modules/tsx/dist/cli.mjs ../server/index.ts",
+    "worker:settlement": "node --env-file=../.env ../node_modules/tsx/dist/cli.mjs ../scripts/settlement-worker.ts",
+    "smoke:marketplace": "node --env-file=../.env ../node_modules/tsx/dist/cli.mjs ../scripts/smoke-marketplace-flow.ts"
+  }
+}
