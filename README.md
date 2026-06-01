@@ -10,6 +10,9 @@ AdNode is a hoster-to-developer ad marketplace where campaign economics can stay
 
 ---
 
+
+
+
 ## What Problem This Solves
 
 | Pain | How AdNode handles it |
