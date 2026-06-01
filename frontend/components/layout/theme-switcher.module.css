@@ -1,10 +1,10 @@
 .wrap {
   display: flex;
   gap: 0.25rem;
-  padding: 0.2rem;
-  border-radius: 999px;
+  padding: 0.18rem;
+  border-radius: var(--radius-sm);
   background: var(--surface-solid);
-  border: 1px solid var(--border);
+  border: var(--rule-hairline) solid var(--border);
 }
 
 .btn {
@@ -14,19 +14,21 @@
   width: 2rem;
   height: 2rem;
   border: none;
-  border-radius: 50%;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
 }
 
 .btn:hover {
   color: var(--text);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: color-mix(in oklch, var(--accent) 10%, transparent);
 }
 
 .active {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--bg);
+  background: var(--accent);
 }

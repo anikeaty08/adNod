@@ -1,14 +1,14 @@
 "use client";
 
-import { Moon, Palette, Snowflake, Sun } from "lucide-react";
+import { Circle, Moon, Square, Sun } from "lucide-react";
 import { useThemeStore, type ThemeId, THEME_LABELS } from "@/lib/theme-store";
 import styles from "./theme-switcher.module.css";
 
 const ICONS: Record<ThemeId, typeof Moon> = {
-  nebula: Palette,
+  nebula: Circle,
   solar: Sun,
-  arctic: Snowflake,
-  mono: Moon,
+  arctic: Moon,
+  mono: Square,
 };
 
 const ORDER: ThemeId[] = ["nebula", "solar", "arctic", "mono"];

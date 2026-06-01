@@ -99,12 +99,20 @@ export async function getJson<T>(path: string): Promise<T> {
 /** Public help chat - same-origin `/api/assistant-chat` so it works on Vercel/local without extra config. */
 export async function postAssistantChat<T>(body: { prompt: string; history: Array<{ role: string; content: string }> }): Promise<T> {
   const base = getApiBase();
-  const url = base ? `${base}/api/assistant-chat` : "/api/assistant-chat";
-  const res = await fetch(url, {
+  const primaryUrl = base ? `${base}/api/assistant-chat` : "/api/assistant-chat";
+  const fallbackUrl = base ? `${base}/api/assistant/chat` : "";
+  let res = await fetch(primaryUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (base && res.status === 404 && fallbackUrl) {
+    res = await fetch(fallbackUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
   const text = await res.text();
   let data: unknown = {};
   try {

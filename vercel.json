@@ -2,7 +2,7 @@
     "$schema": "https://openapi.vercel.sh/vercel.json",
     "framework": "nextjs",
     "buildCommand": "npm run build",
-    "outputDirectory": ".next",
+    "outputDirectory": "frontend/.next",
     "crons": [
         {
             "path": "/api/settlement-worker",

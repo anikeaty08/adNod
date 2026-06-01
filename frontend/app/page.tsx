@@ -6,7 +6,7 @@ import { Nav } from "@/components/layout/nav";
 import { GradientMesh } from "@/components/ui/gradient-mesh";
 import { GlassPanel } from "@/components/ui/glass-panel";
 import { PrimaryButton } from "@/components/ui/primary-button";
-import { Megaphone, LayoutTemplate, Wallet, Sparkles, Shield, Zap, BookOpen } from "lucide-react";
+import { BookOpen, CheckCircle2, LayoutTemplate, Megaphone, Shield, Wallet, Zap } from "lucide-react";
 import { getJson } from "@/lib/adnode-api";
 import { displayCampaignTitle } from "@/lib/campaign-title";
 
@@ -35,16 +35,16 @@ export default function LandingPage() {
     <>
       <GradientMesh />
       <Nav />
-      <main className="container flex flex-col gap-20 pb-8 pt-8 md:gap-28 md:pt-14">
-        <section className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+      <main className="container flex flex-col gap-14 pb-8 pt-8 md:gap-20 md:pt-14">
+        <section className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-muted">Why we&apos;re building AdNode</p>
+            <p className="text-sm font-semibold text-accent">Confidential ad settlement marketplace</p>
             <h1 className="font-display mt-4 text-4xl font-bold leading-[1.08] tracking-tight text-[var(--text)] md:text-5xl lg:text-[3.25rem]">
-              Fair settlement without exposing your strategy.
+              Ads, slots, escrow, and payouts in one wallet app.
             </h1>
             <p className="mt-6 max-w-xl text-base leading-relaxed text-muted md:text-lg">
-              Programmatic placements are stuck between opaque ad networks and fully public on-chain auctions. AdNode is a middle path:
-              Fhenix-style confidential fields for budgets and bids, plus explicit CPC/CPM rules in wei so publishers and auditors see the same payout math.
+              AdNode gives advertisers a campaign flow and publishers a placement flow with enforceable CPC/CPM settlement, signed API sync,
+              Pinata creative uploads, embeds, and claimable earnings.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <PrimaryButton href="/app/studio">
@@ -61,35 +61,35 @@ export default function LandingPage() {
               </PrimaryButton>
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <GlassPanel className="p-5">
               <Shield className="text-accent" size={26} strokeWidth={1.5} />
-              <h3 className="font-display mt-3 text-lg font-semibold text-[var(--text)]">Confidential where it counts</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted">Encrypted handles for economics; public terms for enforcement.</p>
+              <h3 className="font-display mt-3 text-lg font-semibold text-[var(--text)]">Campaign creation</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted">Upload a creative, set settlement terms, fund escrow, and auto-sync metadata.</p>
             </GlassPanel>
             <GlassPanel className="p-5">
               <Zap className="text-accent2" size={26} strokeWidth={1.5} />
-              <h3 className="font-display mt-3 text-lg font-semibold text-[var(--text)]">Built for real sites</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted">Embeds, signed API, and a wallet-native fund & claim loop.</p>
+              <h3 className="font-display mt-3 text-lg font-semibold text-[var(--text)]">Publisher slots</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted">Register placements, request access, assign campaigns, and copy embed code.</p>
             </GlassPanel>
             <GlassPanel className="p-5 sm:col-span-2">
-              <Sparkles className="text-accent" size={26} strokeWidth={1.5} />
-              <h3 className="font-display mt-3 text-lg font-semibold text-[var(--text)]">Modern product surface</h3>
+              <CheckCircle2 className="text-accent" size={26} strokeWidth={1.5} />
+              <h3 className="font-display mt-3 text-lg font-semibold text-[var(--text)]">Settlement loop</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted">
-                A clean Studio and Publisher flow with embeds that work on real sites.
+                Measurement intake, settlement replay, admin approvals, and publisher withdrawals stay wired through the app.
               </p>
             </GlassPanel>
           </div>
         </section>
 
         <section id="workflow" className="scroll-mt-24">
-          <h2 className="font-display text-2xl font-bold text-[var(--text)] md:text-3xl">How teams use it</h2>
+          <h2 className="font-display text-2xl font-bold text-[var(--text)] md:text-3xl">Workflow</h2>
           <p className="mt-2 max-w-2xl text-sm text-muted md:text-base">
             Two roles, two journeys — same chain and API. Connect wallet, pick your path, ship.
           </p>
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             <GlassPanel className="p-6 md:p-8">
-              <p className="text-xs font-semibold uppercase tracking-wider text-accent">Advertiser</p>
+              <p className="font-display text-lg font-semibold text-[var(--text)]">Advertiser</p>
               <ol className="mt-4 list-decimal space-y-3 pl-5 text-sm leading-relaxed text-muted md:text-base">
                 <li>Upload or link a creative.</li>
                 <li>Set category and CPC/CPM terms.</li>
@@ -101,7 +101,7 @@ export default function LandingPage() {
               </PrimaryButton>
             </GlassPanel>
             <GlassPanel className="p-6 md:p-8">
-              <p className="text-xs font-semibold uppercase tracking-wider text-accent2">Publisher / developer</p>
+              <p className="font-display text-lg font-semibold text-[var(--text)]">Publisher / developer</p>
               <ol className="mt-4 list-decimal space-y-3 pl-5 text-sm leading-relaxed text-muted md:text-base">
                 <li>Register a slot with a matching category.</li>
                 <li>Assign an approved campaign.</li>
@@ -121,8 +121,8 @@ export default function LandingPage() {
               <h2 className="font-display text-2xl font-bold text-[var(--text)]">Live campaigns</h2>
               <p className="mt-1 text-sm text-muted">Pulled from the AdNode API metadata store.</p>
             </div>
-            <Link href="/docs" className="cursor-pointer text-sm text-accent hover:underline">
-              Read docs →
+            <Link href="/docs" className="cursor-pointer text-sm font-medium text-accent hover:underline">
+              Read docs
             </Link>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -144,7 +144,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-border bg-[color-mix(in_srgb,var(--surface-solid)_92%,var(--accent)_8%)] p-8 md:p-12">
+        <section className="rounded-lg border border-border bg-[color-mix(in_oklch,var(--surface-solid)_92%,var(--accent)_8%)] p-8 md:p-10">
           <h2 className="font-display text-2xl font-bold text-[var(--text)] md:text-3xl">Docs & support</h2>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted md:text-base">
             Product documentation is laid out like GitBook: quick orientation for hosters and developers, finance rules, and API auth.

@@ -5,7 +5,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <Nav />
-      <main className="container" style={{ paddingBottom: "3rem" }}>
+      <main className="container py-6 md:py-8" style={{ paddingBottom: "3rem" }}>
         {children}
       </main>
     </>

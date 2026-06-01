@@ -1,10 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
-
-const LOTTIE_LOADING = "https://lottie.host/99aa0bbb-4c27-426c-80ad-8d5c66fca415/X5mKZW8uxe.lottie";
-const LOTTIE_MONEY = "https://lottie.host/8ff13709-2b4f-4c10-8d4c-204c4a3edf8a/MBTZvaTfFM.lottie";
+import { LoaderCircle, WalletCards } from "lucide-react";
 
 type OverlayMode = null | "loading" | "money";
 
@@ -70,17 +67,21 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
       {children}
       {mode ? (
         <div
-          className="fixed inset-0 z-[10000] flex flex-col items-center justify-center gap-4 bg-black/80 backdrop-blur-md"
+          className="fixed inset-0 z-[10000] flex flex-col items-center justify-center gap-4 bg-[color-mix(in_oklch,var(--bg)_86%,var(--text)_14%)] p-6"
           style={{ pointerEvents: "auto" }}
           role="alert"
           aria-busy="true"
           aria-live="polite"
         >
-          <div className="h-52 w-52 md:h-64 md:w-64">
-            <DotLottieReact src={mode === "money" ? LOTTIE_MONEY : LOTTIE_LOADING} loop autoplay />
+          <div className="grid h-20 w-20 place-items-center rounded-lg border border-border bg-[var(--surface-solid)] shadow-[var(--shadow-card)]">
+            {mode === "money" ? (
+              <WalletCards className="text-accent" size={30} strokeWidth={1.8} />
+            ) : (
+              <LoaderCircle className="animate-spin text-accent" size={30} strokeWidth={1.8} />
+            )}
           </div>
-          <p className="max-w-xs text-center text-sm text-white/85">
-            {mode === "money" ? "Confirming payment on-chain…" : "Loading — hang tight…"}
+          <p className="max-w-xs text-center text-sm font-medium text-[var(--text)]">
+            {mode === "money" ? "Confirm the wallet transaction to continue." : "Working..."}
           </p>
         </div>
       ) : null}

@@ -1,23 +1,25 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(8, 9, 13, 0.9);
+  background: color-mix(in oklch, var(--bg) 86%, var(--text) 14%);
   display: grid;
   place-items: center;
   z-index: 80;
+  padding: var(--space-lg);
 }
 
 .card {
   width: min(420px, 92vw);
-  background: #10121a;
-  border: 1px solid #21273a;
-  border-radius: 16px;
+  background: var(--surface-solid);
+  border: var(--rule-hairline) solid var(--border);
+  border-radius: var(--radius-md);
   padding: 1.25rem;
   text-align: center;
+  box-shadow: var(--shadow-card);
 }
 
 .label {
-  color: #a78bfa;
+  color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 0.75rem;
@@ -25,15 +27,23 @@
 
 .cta {
   margin-top: 1rem;
-  background: #4f8ef7;
-  border: 0;
-  color: #f0f4ff;
-  border-radius: 12px;
+  background: var(--accent);
+  border: var(--rule-hairline) solid var(--accent);
+  color: var(--bg);
+  border-radius: var(--radius-sm);
   padding: 0.6rem 1rem;
   cursor: pointer;
+  font-weight: 700;
 }
 
 .sticker {
-  max-width: 140px;
+  display: grid;
+  width: 4.5rem;
+  height: 4.5rem;
+  place-items: center;
   margin: 0 auto;
+  color: var(--accent);
+  border: var(--rule-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--accent) 8%, transparent);
 }

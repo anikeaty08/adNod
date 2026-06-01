@@ -184,7 +184,7 @@ export function HelpChat() {
       {open ? (
         <button
           type="button"
-          className="fixed inset-0 z-[8990] cursor-pointer border-0 bg-black/35 p-0"
+          className="fixed inset-0 z-[8990] cursor-pointer border-0 bg-[color-mix(in_oklch,var(--text)_28%,transparent)] p-0"
           aria-label="Close help chat"
           onClick={() => setOpen(false)}
         />
@@ -200,7 +200,7 @@ export function HelpChat() {
       >
         <div className="pointer-events-auto flex flex-col items-end gap-3">
           {open ? (
-            <div className="flex h-[min(520px,70vh)] w-[min(380px,92vw)] flex-col overflow-hidden rounded-2xl border border-border bg-[var(--surface-solid)] shadow-2xl ring-1 ring-black/10">
+            <div className="flex h-[min(520px,70vh)] w-[min(380px,92vw)] flex-col overflow-hidden rounded-lg border border-border bg-[var(--surface-solid)] shadow-[var(--shadow-card)]">
               <div
                 role="toolbar"
                 aria-label="Move chat"
@@ -219,7 +219,7 @@ export function HelpChat() {
                   return (
                     <div key={i} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                       <div
-                        className={`max-w-[92%] whitespace-pre-wrap rounded-2xl border px-3 py-2 leading-relaxed ${
+                        className={`max-w-[92%] whitespace-pre-wrap rounded-md border px-3 py-2 leading-relaxed ${
                           isUser
                             ? "border-[color-mix(in_srgb,var(--accent)_45%,transparent)] bg-[color-mix(in_srgb,var(--accent)_18%,transparent)] text-[var(--text)]"
                             : "border-[color-mix(in_srgb,var(--text)_10%,transparent)] bg-[color-mix(in_srgb,var(--text)_6%,transparent)] text-muted"
@@ -234,7 +234,7 @@ export function HelpChat() {
               </div>
               <div className="flex shrink-0 gap-2 border-t border-border bg-[color-mix(in_srgb,var(--surface-solid)_96%,var(--accent)_4%)] p-2">
                 <input
-                  className="min-w-0 flex-1 rounded-2xl border border-border bg-[var(--bg)] px-3 py-2.5 text-sm text-[var(--text)] outline-none focus:ring-2 focus:ring-accent/40"
+                  className="min-w-0 flex-1 rounded-md border border-border bg-[var(--bg)] px-3 py-2.5 text-sm text-[var(--text)] outline-none focus:ring-2 focus:ring-[color-mix(in_oklch,var(--accent)_28%,transparent)]"
                   placeholder="Ask anything…"
                   value={input}
                   disabled={busy}
@@ -243,7 +243,7 @@ export function HelpChat() {
                 />
                 <button
                   type="button"
-                  className="rounded-2xl bg-accent px-3 py-2.5 text-[var(--bg)] disabled:opacity-40"
+                  className="rounded-md bg-accent px-3 py-2.5 text-[var(--bg)] disabled:opacity-40"
                   disabled={busy}
                   onClick={() => void send()}
                   aria-label="Send"
@@ -258,7 +258,7 @@ export function HelpChat() {
             type="button"
             onPointerDown={(e) => startDrag(e, "fab")}
             onClick={onFabClick}
-            className="flex h-14 w-14 shrink-0 cursor-grab touch-none select-none items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--accent)_50%,transparent)] bg-[color-mix(in_srgb,var(--accent)_25%,var(--bg))] text-[var(--text)] shadow-lg shadow-black/30 transition hover:scale-[1.03] active:cursor-grabbing active:scale-95"
+            className="flex h-14 w-14 shrink-0 cursor-grab touch-none select-none items-center justify-center rounded-lg border border-[color-mix(in_oklch,var(--accent)_50%,transparent)] bg-[color-mix(in_oklch,var(--accent)_18%,var(--bg))] text-[var(--text)] shadow-[var(--shadow-card)] transition hover:scale-[1.03] active:cursor-grabbing active:scale-95"
             aria-label={open ? "Close help chat" : "Open help chat"}
           >
             {open ? <X size={22} /> : <MessageCircle size={22} />}

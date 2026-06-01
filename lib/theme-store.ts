@@ -19,8 +19,8 @@ export const useThemeStore = create<ThemeState>()(
 );
 
 export const THEME_LABELS: Record<ThemeId, string> = {
-  nebula: "Nebula",
-  solar: "Solar",
-  arctic: "Arctic",
+  nebula: "Default",
+  solar: "Warm",
+  arctic: "Dark",
   mono: "Mono",
 };

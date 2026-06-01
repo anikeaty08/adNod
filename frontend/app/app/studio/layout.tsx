@@ -8,9 +8,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
   return (
     <>
       <GradientMesh />
-      <ConnectGate>
-        <div className="pb-12 pt-2">{children}</div>
-      </ConnectGate>
+      <ConnectGate>{children}</ConnectGate>
     </>
   );
 }

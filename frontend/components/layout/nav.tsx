@@ -9,7 +9,6 @@ import { BookOpen, Clapperboard, Home, LayoutGrid, LayoutTemplate, PlusCircle, S
 import { ADNODE_CHAIN_ID, adnodeChain } from "@/lib/chain";
 import { ThemeSwitcher } from "./theme-switcher";
 import { AdNodeLogo } from "@/components/brand/adnode-logo";
-import { HoverFlipText } from "@/components/ui/hover-flip-text";
 
 const studioLinks: readonly { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Home", icon: Home },
@@ -67,7 +66,7 @@ export function Nav() {
   const mode = studioMode ? "studio" : "browse";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[color-mix(in_srgb,var(--text)_8%,transparent)] bg-[color-mix(in_srgb,var(--bg)_92%,transparent)] backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-border bg-[color-mix(in_oklch,var(--bg)_94%,transparent)] backdrop-blur-md">
       <nav className="container flex flex-wrap items-center justify-between gap-3 py-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 md:gap-5">
           <Link href="/" className="flex shrink-0 cursor-pointer items-center gap-2 text-[var(--text)] hover:opacity-90">
@@ -80,14 +79,14 @@ export function Nav() {
                 <Link
                   key={`${mode}-${href}`}
                   href={href}
-                  className={`group flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors sm:px-3 ${
+                  className={`group flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors sm:px-3 ${
                     active
-                      ? "bg-accent/25 text-[var(--text)]"
-                      : "text-muted hover:bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] hover:text-[var(--text)]"
+                      ? "bg-[var(--accent)] text-[var(--bg)]"
+                      : "text-muted hover:bg-[color-mix(in_oklch,var(--accent)_10%,transparent)] hover:text-[var(--text)]"
                   }`}
                 >
                   <Icon size={17} strokeWidth={1.75} />
-                  <HoverFlipText text={label} className="max-w-[7.5rem] truncate sm:max-w-none" />
+                  <span className="max-w-[7.5rem] truncate sm:max-w-none">{label}</span>
                 </Link>
               );
             })}
@@ -96,7 +95,7 @@ export function Nav() {
         <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
           <ThemeSwitcher />
           <span className="hidden text-xs text-muted lg:inline">
-            <span style={{ color: ok ? "var(--success, #22c55e)" : "var(--warning, #f59e0b)" }}>●</span> {ok ? adnodeChain.name : "Network"}
+            <span style={{ color: ok ? "var(--success)" : "var(--warning)" }}>●</span> {ok ? adnodeChain.name : "Network"}
           </span>
           <ConnectButton showBalance={false} />
         </div>
