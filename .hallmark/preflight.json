@@ -1,9 +1,0 @@
-{
-  "date": "2026-06-01",
-  "framework": "Next.js 14 app router",
-  "font_stack": "Inter + Space Grotesk via Google Fonts",
-  "palette": "CSS custom properties imported through frontend/app/themes.css",
-  "motion": "framer-motion and gsap installed; app uses restrained CSS transitions",
-  "spacing": "Tailwind plus Hallmark 4pt token scale",
-  "preserve": ["wallet flows", "API routes", "contract interactions", "documentation content"]
-}
